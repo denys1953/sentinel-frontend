@@ -37,8 +37,9 @@ export const SocketProvider = ({ children }) => {
     }
 
     const token = localStorage.getItem('token');
-    const fingerprint = user.fingerprint
-    const wsUrl = `ws://${window.location.hostname}:8000/ws/${fingerprint}?token=${token}`;
+    const fingerprint = user.fingerprint;
+    const wsBase = import.meta.env.VITE_WS_URL;
+    const wsUrl = `${wsBase}/ws/${fingerprint}?token=${token}`;
     
     let isShuttingDown = false;
     const ws = new WebSocket(wsUrl);
