@@ -10,7 +10,15 @@ const PBKDF2_ITERATIONS = 100000;
 
 // Buffer
 const bufToBase64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
-const base64ToBuf = (str) => Uint8Array.from(atob(str), (c) => c.charCodeAt(0));
+const base64ToBuf = (str) => {
+  if (!str) return new Uint8Array(0);
+  try {
+    return Uint8Array.from(atob(str), (c) => c.charCodeAt(0));
+  } catch (e) {
+    console.error("Base64 decoding error", e);
+    return new Uint8Array(0);
+  }
+};
 
 async function deriveMasterKey(password, salt) {
   const encoder = new TextEncoder();
@@ -85,7 +93,7 @@ export const decryptPrivateKey = async (encPrivateKeyB64, password, salt) => {
       "pkcs8",
       decryptedPrivBuf,
       RSA_PARAMS,
-      true,
+      false,
       ["decrypt"]
     );
   } catch (e) {
@@ -102,23 +110,72 @@ export const encryptForRecipient = async (text, publicKeyB64) => {
     ["encrypt"]
   );
 
-  const encoder = new TextEncoder();
-  const encrypted = await window.crypto.subtle.encrypt(
-    RSA_PARAMS,
-    pubKey,
-    encoder.encode(text)
+  const aesKey = await window.crypto.subtle.generateKey(
+    { name: "AES-GCM", length: 256 },
+    true,
+    ["encrypt", "decrypt"]
   );
 
-  return bufToBase64(encrypted);
+  const iv = window.crypto.getRandomValues(new Uint8Array(12));
+  const encoder = new TextEncoder();
+  const encodedText = encoder.encode(text);
+
+  const ciphertext = await window.crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    aesKey,
+    encodedText
+  );
+
+  const exportedAesKey = await window.crypto.subtle.exportKey("raw", aesKey);
+  const encryptedAesKey = await window.crypto.subtle.encrypt(
+    RSA_PARAMS,
+    pubKey,
+    exportedAesKey
+  );
+
+  const combined = new Uint8Array(iv.length + encryptedAesKey.byteLength + ciphertext.byteLength);
+  combined.set(iv);
+  combined.set(new Uint8Array(encryptedAesKey), iv.length);
+  combined.set(new Uint8Array(ciphertext), iv.length + encryptedAesKey.byteLength);
+
+  return bufToBase64(combined);
 };
 
 export const decryptWithPrivateKey = async (encryptedB64, privateKey) => {
-  const decrypted = await window.crypto.subtle.decrypt(
+  const combined = base64ToBuf(encryptedB64);
+  
+  const iv = combined.slice(0, 12);
+  const encAesKey = combined.slice(12, 268); 
+  const ciphertext = combined.slice(268);
+
+  const aesKeyRaw = await window.crypto.subtle.decrypt(
     RSA_PARAMS,
     privateKey,
-    base64ToBuf(encryptedB64)
+    encAesKey
+  );
+
+  const aesKey = await window.crypto.subtle.importKey(
+    "raw",
+    aesKeyRaw,
+    { name: "AES-GCM" },
+    false,
+    ["decrypt"]
+  );
+
+  const decrypted = await window.crypto.subtle.decrypt(
+    { name: "AES-GCM", iv },
+    aesKey,
+    ciphertext
   );
 
   const decoder = new TextDecoder();
   return decoder.decode(decrypted);
+};
+
+export const prepareE2EEPayload = async (text, recipientPubKey, myPubKey) => {
+  const content_encoded = await encryptForRecipient(text, recipientPubKey);
+  
+  const content_self = await encryptForRecipient(text, myPubKey);
+
+  return { content_encoded, content_self };
 };

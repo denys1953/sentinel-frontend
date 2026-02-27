@@ -11,7 +11,7 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, setPrivateKey } = useAuth();
   const navigate = useNavigate();
 
   const handleRegister = async (e) => {
@@ -30,11 +30,12 @@ export default function RegisterPage() {
         salt: salt
       });
 
-      await db.keys.put({ username, rawPrivateKey, salt });
+      await db.keys.put({ username, encPrivateKey, salt });
 
       setSuccess(true);
       
       await login(username, password);
+      setPrivateKey(rawPrivateKey);
 
       setTimeout(() => {
         navigate('/chat');

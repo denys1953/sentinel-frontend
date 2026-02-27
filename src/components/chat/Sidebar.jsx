@@ -1,12 +1,86 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import api from '../../api/axios';
+import { useSocket } from '../../context/SocketContext';
 
-export default function Sidebar({ user, onLogout }) {
+export default function Sidebar({ user, onLogout, onContactSelect, activeContactId }) {
+  const { messages } = useSocket();
   const [sidebarWidth, setSidebarWidth] = useState(320);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [conversations, setConversations] = useState([]);
+  const [isLoadingConversations, setIsLoadingConversations] = useState(false);
   const isResizing = useRef(false);
+
+  useEffect(() => {
+    const fetchConversations = async () => {
+      if (!user) return;
+      setIsLoadingConversations(true);
+      try {
+        const response = await api.get('/conversations');
+        setConversations(Array.isArray(response.data) ? response.data : []);
+      } catch (error) {
+        console.error("Fetch conversations error:", error);
+      } finally {
+        setIsLoadingConversations(false);
+      }
+    };
+
+    fetchConversations();
+  }, [user]);
+
+  useEffect(() => {
+    if (messages.length === 0) return;
+    const lastMsg = messages[messages.length - 1];
+    
+    if (!lastMsg.conversation_id) return;
+
+    setConversations(prev => prev.map(conv => {
+        if (Number(conv.id) === Number(lastMsg.conversation_id)) {
+            let updatedConv = { 
+              ...conv, 
+              updated_at: lastMsg.created_at || new Date().toISOString() 
+            };
+            
+            const isMe = lastMsg.sender_fp === user?.fingerprint;
+            const isCurrentChat = Number(lastMsg.conversation_id) === Number(activeContactId);
+
+            if (!isMe && !isCurrentChat) {
+                updatedConv.participants = updatedConv.participants.map(p => {
+                    if (p.user?.fingerprint === user?.fingerprint) {
+                        return { ...p, unread_count: (p.unread_count || 0) + 1 };
+                    }
+                    return p;
+                });
+            }
+            return updatedConv;
+        }
+        return conv;
+    }));
+  }, [messages.length, user?.fingerprint]); 
+
+  useEffect(() => {
+    if (activeContactId) {
+        setConversations(prev => prev.map(conv => {
+            if (Number(conv.id) === Number(activeContactId)) {
+                return {
+                    ...conv,
+                    participants: conv.participants.map(p => {
+                        if (p.user?.fingerprint === user?.fingerprint) {
+                            return { ...p, unread_count: 0 };
+                        }
+                        return p;
+                    })
+                };
+            }
+            return conv;
+        }));
+    }
+  }, [activeContactId, user?.fingerprint]);
+
+  const handleSelect = (contact, convId) => {
+    onContactSelect(contact);
+  };
 
   const startResizing = useCallback(() => {
     isResizing.current = true;
@@ -38,20 +112,34 @@ export default function Sidebar({ user, onLogout }) {
     };
   }, [resize, stopResizing]);
 
+  const getOtherParticipant = (participants) => {
+    if (!participants || !Array.isArray(participants)) return null;
+    const participant = participants.find(p => p.user?.fingerprint !== user?.fingerprint);
+    return participant?.user || null;
+  };
+
+  const getMyUnreadCount = (participants) => {
+    if (!participants || !Array.isArray(participants)) return 0;
+    const me = participants.find(p => p.user?.fingerprint === user?.fingerprint);
+    return me?.unread_count || 0;
+  };
+
   useEffect(() => {
     const fetchUsers = async () => {
-      if (!searchQuery.trim()) {
+      const term = searchQuery.trim();
+      if (!term) {
         setSearchResults([]);
         return;
       }
       
       setIsSearching(true);
       try {
-        const response = await api.get(`/users?search=${searchQuery.trim()}`);
-        const filteredUsers = response.data.filter(u => u.username !== user?.username);
-        setSearchResults(filteredUsers);
+        const response = await api.get('/users', { params: { search: term } });
+        const results = Array.isArray(response.data) ? response.data : [];
+        setSearchResults(results.filter(u => u.username !== user?.username));
       } catch (error) {
         console.error("Search error:", error);
+        setSearchResults([]);
       } finally {
         setIsSearching(false);
       }
@@ -66,9 +154,9 @@ export default function Sidebar({ user, onLogout }) {
       style={{ width: `${sidebarWidth}px` }}
       className="flex flex-col border-r border-slate-800 bg-slate-800/50 backdrop-blur-sm relative shrink-0"
     >
-      <div className="p-6 border-b border-slate-700/50">        
+      <div className="h-16 flex items-center px-4 border-b border-slate-700/50">        
         {/* Search Input */}
-        <div className="relative">
+        <div className="relative w-full">
           <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-500">
             {isSearching ? (
               <div className="w-4 h-4 rounded-full border-2 border-slate-600 border-t-blue-500 animate-spin" />
@@ -81,7 +169,7 @@ export default function Sidebar({ user, onLogout }) {
           <input
             type="text"
             className="w-full bg-slate-900/50 text-slate-200 text-sm rounded-xl py-2 pl-10 pr-4 border border-slate-700 focus:outline-none focus:border-blue-500/50 transition-all placeholder:text-slate-600"
-            placeholder="Пошук контактів..."
+            placeholder="Пошук..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -99,14 +187,27 @@ export default function Sidebar({ user, onLogout }) {
               searchResults.map((contact) => (
                 <button
                   key={contact.id || contact.username}
-                  className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-slate-700/50 transition-colors group text-left"
+                  onClick={() => onContactSelect(contact)}
+                  className={`w-full flex items-center gap-3 p-3 rounded-xl transition-colors group text-left ${
+                    (activeContactId === (contact.id || contact.username))
+                    ? 'bg-blue-600 text-white' 
+                    : 'hover:bg-slate-700/50 text-slate-200'
+                  }`}
                 >
-                  <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center font-bold text-blue-400 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-colors ${
+                    (activeContactId === (contact.id || contact.username))
+                    ? 'bg-white/20 text-white'
+                    : 'bg-slate-700 text-blue-400 group-hover:bg-blue-600 group-hover:text-white'
+                  }`}>
                     {contact.username?.[0]?.toUpperCase()}
                   </div>
                   <div className="flex-1 overflow-hidden">
-                    <div className="font-medium truncate text-slate-200">{contact.username}</div>
-                    <div className="text-xs text-slate-500 truncate">Додати до розмови</div>
+                    <div className="font-medium truncate">{contact.username}</div>
+                    <div className={`text-xs truncate ${
+                      (activeContactId === (contact.id || contact.username))
+                      ? 'text-blue-100'
+                      : 'text-slate-500'
+                    }`}>Додати до розмови</div>
                   </div>
                 </button>
               ))
@@ -115,8 +216,54 @@ export default function Sidebar({ user, onLogout }) {
             ) : null}
           </div>
         ) : (
-          <div className="flex flex-col gap-2 p-4 text-center">
-            <p className="text-slate-500 text-sm">Ваші активні чати будуть тут</p>
+          <div className="flex flex-col gap-1">
+            <h3 className="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
+              Активні чати
+            </h3>
+            {conversations.length > 0 ? (
+              [...conversations]
+                .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
+                .map((conv) => {
+                const other = getOtherParticipant(conv.participants);
+                if (!other) return null;
+
+                const isActive = activeContactId === conv.id;
+                const unreadCount = getMyUnreadCount(conv.participants);
+                
+                return (
+                  <button
+                    key={conv.id}
+                    onClick={() => handleSelect({ ...other, conversation_id: conv.id }, conv.id)}
+                    className={`w-full flex items-center gap-3 p-3 rounded-xl transition-colors group text-left ${
+                      isActive ? 'bg-blue-600 text-white' : 'hover:bg-slate-700/50 text-slate-200'
+                    }`}
+                  >
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-colors shrink-0 ${
+                      isActive ? 'bg-white/20 text-white' : 'bg-slate-700 text-blue-400 group-hover:bg-blue-600 group-hover:text-white'
+                    }`}>
+                      {other.username?.[0]?.toUpperCase()}
+                    </div>
+                    <div className="flex-1 overflow-hidden pr-2">
+                      <div className="font-medium truncate">{other.username}</div>
+                      <div className={`text-xs truncate ${isActive ? 'text-blue-100' : 'text-slate-500'}`}>
+                        {conv.type === 'direct' ? 'Особистий чат' : 'Груповий чат'}
+                      </div>
+                    </div>
+                    {unreadCount > 0 && !isActive && (
+                      <div className="bg-red-500 text-white text-[10px] font-bold h-5 min-w-[20px] px-1.5 rounded-full flex items-center justify-center shadow-lg animate-in zoom-in-50 duration-200">
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                      </div>
+                    )}
+                  </button>
+                );
+              })
+            ) : isLoadingConversations ? (
+              <p className="text-center text-slate-500 text-sm mt-4 animate-pulse">Завантаження...</p>
+            ) : (
+              <p className="text-center text-slate-500 text-sm mt-4 italic px-4">
+                Немає активних чатів. Скористайтеся пошуком, щоб почати розмову.
+              </p>
+            )}
           </div>
         )}
       </div>

@@ -9,7 +9,7 @@ export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const { login } = useAuth();
+  const { login, setPrivateKey } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const isExpired = searchParams.get('expired') || searchParams.get('message') === 'session_expired';
@@ -23,8 +23,10 @@ export default function LoginPage() {
       const res = await api.get('/users/me'); 
       const { enc_private_key, salt } = res.data;
 
-      await decryptPrivateKey(enc_private_key, password, salt);
+      const privKey = await decryptPrivateKey(enc_private_key, password, salt);
+      setPrivateKey(privKey);
       
+      localStorage.setItem('last_pwd', password); 
       await db.keys.put({ username, encPrivateKey: enc_private_key, salt });
 
       navigate('/chat');
