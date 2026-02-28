@@ -17,7 +17,7 @@ export default function Sidebar({ user, onLogout, onContactSelect, activeContact
       if (!user) return;
       setIsLoadingConversations(true);
       try {
-        const response = await api.get('/conversations');
+        const response = await api.get('/conversations/');
         setConversations(Array.isArray(response.data) ? response.data : []);
       } catch (error) {
         console.error("Fetch conversations error:", error);
