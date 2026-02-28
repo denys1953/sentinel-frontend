@@ -40,7 +40,7 @@ export const AuthProvider = ({ children }) => {
             }
           }
           
-          const res = await api.get('/users/me');
+          const res = await api.get('/users/me/');
           setUser(prev => {
             if (prev && prev.id === res.data.id && prev.fingerprint === res.data.fingerprint) {
               return prev;
@@ -68,7 +68,7 @@ export const AuthProvider = ({ children }) => {
     formData.append('username', username.trim());
     formData.append('password', password);
 
-    const response = await api.post('/auth/login', formData, {
+    const response = await api.post('/auth/login/', formData, {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'
       }
@@ -83,7 +83,7 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('user', JSON.stringify(loggedUser));
       setUser(loggedUser);
     } else {
-      const meRes = await api.get('/users/me');
+      const meRes = await api.get('/users/me/');
       localStorage.setItem('user', JSON.stringify(meRes.data));
       setUser(meRes.data);
     }

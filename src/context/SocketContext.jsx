@@ -216,7 +216,7 @@ export const SocketProvider = ({ children }) => {
         });
       }
 
-      const response = await api.get(`/conversations/${conversationId}`);
+      const response = await api.get(`/conversations/${conversationId}/`);
       const history = response.data;
 
       const decodedHistory = await Promise.all(history.map(async (m) => {

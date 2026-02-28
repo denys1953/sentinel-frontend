@@ -22,7 +22,7 @@ export default function RegisterPage() {
     try {
       const { publicKey, encPrivateKey, salt, rawPrivateKey } = await generateRegistrationData(password);
 
-      await api.post('/auth/register', {
+      await api.post('/auth/register/', {
         username,
         password,
         public_key: publicKey,
