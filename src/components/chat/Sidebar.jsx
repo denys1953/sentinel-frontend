@@ -134,7 +134,7 @@ export default function Sidebar({ user, onLogout, onContactSelect, activeContact
       
       setIsSearching(true);
       try {
-        const response = await api.get('/users', { params: { search: term } });
+        const response = await api.get('/users/', { params: { search: term } });
         const results = Array.isArray(response.data) ? response.data : [];
         setSearchResults(results.filter(u => u.username !== user?.username));
       } catch (error) {
