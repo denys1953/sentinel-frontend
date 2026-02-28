@@ -20,7 +20,7 @@ export default function LoginPage() {
     try {
       await login(username, password);
       
-      const res = await api.get('/users/me/'); 
+      const res = await api.get('/users/me'); 
       const { enc_private_key, salt } = res.data;
 
       const privKey = await decryptPrivateKey(enc_private_key, password, salt);
