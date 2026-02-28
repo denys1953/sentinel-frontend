@@ -1,7 +1,11 @@
 import axios from 'axios';
 
+const apiBaseUrl = import.meta.env.VITE_API_URL 
+  ? import.meta.env.VITE_API_URL 
+  : `${window.location.protocol}//${window.location.host.replace(':5173', ':8000')}`;
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
+  baseURL: apiBaseUrl,
 });
 
 api.interceptors.request.use((config) => {

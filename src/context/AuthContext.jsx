@@ -21,7 +21,7 @@ export const AuthProvider = ({ children }) => {
       } else if (token) {
         try {
           const userData = storedUser ? JSON.parse(storedUser) : null;
-          if (userData) {
+          if (userData && userData.username) {
             setUser(userData);
             
             const keyRecord = await db.keys.get(userData.username);
