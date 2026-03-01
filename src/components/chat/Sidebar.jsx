@@ -26,7 +26,15 @@ export default function Sidebar({ user, onLogout, onContactSelect, activeContact
       }
     };
 
+    window.__triggerSidebarUpdate = () => {
+      fetchConversations();
+    };
+
     fetchConversations();
+
+    return () => {
+      delete window.__triggerSidebarUpdate;
+    };
   }, [user]);
 
   useEffect(() => {
@@ -35,7 +43,17 @@ export default function Sidebar({ user, onLogout, onContactSelect, activeContact
     
     if (!lastMsg.conversation_id) return;
 
-    setConversations(prev => prev.map(conv => {
+    setConversations(prev => {
+      const exists = prev.some(c => Number(c.id) === Number(lastMsg.conversation_id));
+      
+      if (!exists) {
+        api.get('/conversations/').then(res => {
+          setConversations(Array.isArray(res.data) ? res.data : []);
+        }).catch(err => console.error("Refresh convs failed", err));
+        return prev;
+      }
+
+      return prev.map(conv => {
         if (Number(conv.id) === Number(lastMsg.conversation_id)) {
             let updatedConv = { 
               ...conv, 
@@ -56,7 +74,8 @@ export default function Sidebar({ user, onLogout, onContactSelect, activeContact
             return updatedConv;
         }
         return conv;
-    }));
+      });
+    });
   }, [messages.length, user?.fingerprint]); 
 
   useEffect(() => {

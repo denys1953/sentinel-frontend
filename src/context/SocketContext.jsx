@@ -87,6 +87,11 @@ export const SocketProvider = ({ children }) => {
             };
 
             await db.messages.put(incomingMsg);
+
+            if (window.__triggerSidebarUpdate) {
+              window.__triggerSidebarUpdate();
+            }
+
             setMessages(prev => {
                if (prev.some(m => m.id === incomingMsg.id)) return prev;
                
