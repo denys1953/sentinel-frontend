@@ -88,7 +88,7 @@ export const SocketProvider = ({ children }) => {
 
             await db.messages.put(incomingMsg);
 
-            if (window.__triggerSidebarUpdate) {
+            if (typeof window !== 'undefined' && window.__triggerSidebarUpdate) {
               window.__triggerSidebarUpdate();
             }
 
@@ -178,6 +178,10 @@ export const SocketProvider = ({ children }) => {
       };
 
       socketRef.current.send(JSON.stringify(payload));
+
+      if (typeof window !== 'undefined' && window.__triggerSidebarUpdate) {
+        window.__triggerSidebarUpdate();
+      }
 
       const optimisticMsg = {
         id: Date.now(), 
