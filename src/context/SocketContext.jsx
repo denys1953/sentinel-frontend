@@ -10,29 +10,15 @@ const SocketContext = createContext();
 export const SocketProvider = ({ children }) => {
   const { user, privateKey } = useAuth();
   const [messages, setMessages] = useState([]);
+  const [isConnected, setIsConnected] = useState(false);
   const [currentChatId, setCurrentChatId] = useState(null);
   const currentChatIdRef = useRef(null);
   const socketRef = useRef(null);
+  const reconnectTimeoutRef = useRef(null);
 
-  const setCurrentChat = (conversationId) => {
-    setCurrentChatId(conversationId);
-    currentChatIdRef.current = conversationId ? Number(conversationId) : null;
-    
-    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-      socketRef.current.send(JSON.stringify({
-        type: "enter_chat",
-        conversation_id: conversationId,
-        recipient_fp: user?.fingerprint
-      }));
-    }
-  };
-
-  useEffect(() => {
-    if (!user || !privateKey) {
-      if (socketRef.current) {
-        socketRef.current.close();
-        socketRef.current = null;
-      }
+  const connect = useCallback(() => {
+    if (!user || !privateKey) return;
+    if (socketRef.current && (socketRef.current.readyState === WebSocket.OPEN || socketRef.current.readyState === WebSocket.CONNECTING)) {
       return;
     }
 
@@ -41,19 +27,26 @@ export const SocketProvider = ({ children }) => {
     const wsBase = import.meta.env.VITE_WS_URL;
     const wsUrl = `${wsBase}/ws/${fingerprint}?token=${token}`;
     
-    let isShuttingDown = false;
     const ws = new WebSocket(wsUrl);
     socketRef.current = ws;
 
     ws.onopen = () => {
-      if (isShuttingDown) {
-        ws.close(1000, "Cleanup during connection process");
-        return;
+      setIsConnected(true);
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
+      
+      if (currentChatIdRef.current) {
+        ws.send(JSON.stringify({
+          type: "enter_chat",
+          conversation_id: currentChatIdRef.current,
+          recipient_fp: user?.fingerprint
+        }));
       }
     };
     
     ws.onmessage = async (event) => {
-      if (isShuttingDown) return;
       try {
         const data = JSON.parse(event.data);
         if (data.type === 'error') {
@@ -128,34 +121,66 @@ export const SocketProvider = ({ children }) => {
       }
     };
 
-    ws.onerror = (error) => {
-      if (!isShuttingDown) {
-        console.error("🚫 WebSocket ERROR:", error);
-      }
-    };
 
     ws.onclose = (event) => {
-      if (isShuttingDown) {
-      } else {
-        console.warn("🔌 WebSocket disconnected!", {
-          code: event.code,
-          reason: event.reason,
-          wasClean: event.wasClean
-        });
+      if (socketRef.current === ws || socketRef.current === null) {
+        setIsConnected(false);
         
         if (socketRef.current === ws) {
           socketRef.current = null;
         }
+
+        if (user && privateKey && event.code !== 1000 && event.code !== 1001) {
+          if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+          reconnectTimeoutRef.current = setTimeout(() => {
+            connect();
+          }, 3000);
+        }
       }
     };
+  }, [user, privateKey, decryptWithPrivateKey]);
+
+  const setCurrentChat = (conversationId) => {
+    setCurrentChatId(conversationId);
+    currentChatIdRef.current = conversationId ? Number(conversationId) : null;
+    
+    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify({
+        type: "enter_chat",
+        conversation_id: conversationId,
+        recipient_fp: user?.fingerprint
+      }));
+    }
+  };
+
+  useEffect(() => {
+    if (user && privateKey) {
+      const timer = setTimeout(() => {
+        connect();
+      }, 50);
+      return () => clearTimeout(timer);
+    } else {
+      if (socketRef.current) {
+        socketRef.current.close(1000, "User logged out");
+        socketRef.current = null;
+      }
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
+    }
 
     return () => {
-      isShuttingDown = true;
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.close(1000, "Component unmounting or dependency changed");
+      if (socketRef.current) {
+        socketRef.current.close(1000, "Component unmounting");
+        socketRef.current = null;
+      }
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
       }
     };
-  }, [user?.fingerprint, privateKey]);
+  }, [connect, user, privateKey]);
 
   const sendMessage = async (text, activeContact) => {
     if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
@@ -267,7 +292,7 @@ export const SocketProvider = ({ children }) => {
   }, [user, privateKey]);
 
   return (
-    <SocketContext.Provider value={{ messages, sendMessage, addLocalMessage, fetchMessages, setCurrentChat }}>
+    <SocketContext.Provider value={{ isConnected, messages, sendMessage, addLocalMessage, fetchMessages, setCurrentChat }}>
       {children}
     </SocketContext.Provider>
   );
