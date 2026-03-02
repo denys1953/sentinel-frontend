@@ -1,0 +1,21 @@
+name: Deploy Frontend
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Update code and rebuild
+        run: |
+          cd /home/ubuntu/sentinel-app/sentinel-frontend
+          git pull origin main
+          cd ..
+          
+          docker-compose build --no-cache frontend
+          docker-compose up -d frontend
+          
+      - name: Cleanup
+        run: docker image prune -f
