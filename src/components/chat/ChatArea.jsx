@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react';
 import { useSocket } from '../../context/SocketContext';
 import { useAuth } from '../../context/AuthContext';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
@@ -9,20 +9,27 @@ export default function ChatArea({ activeContact, onBack }) {
   const { messages, sendMessage, fetchMessages, setCurrentChat, isConnected } = useSocket();
   const { user } = useAuth();
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
+  const lastMessageIdRef = useRef(null);
+  const prevScrollHeightRef = useRef(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   
   const onlineStatuses = useOnlineStatus(activeContact?.fingerprint, 30000);
   const isOnline = activeContact ? !!onlineStatuses[activeContact.fingerprint] : false;
 
   useEffect(() => {
+    setHasMore(true); 
+    lastMessageIdRef.current = null;
     if (activeContact?.conversation_id) {
-       fetchMessages(activeContact.conversation_id);
+       fetchMessages(activeContact.conversation_id, 0);
        setCurrentChat(activeContact.conversation_id);
     } else {
        setCurrentChat(null);
     }
-  }, [activeContact?.conversation_id]);
+  }, [activeContact?.conversation_id, fetchMessages]);
 
-  const activeMessages = messages.filter(m => {
+  const activeMessages = useMemo(() => messages.filter(m => {
     if (activeContact?.conversation_id) {
       return Number(m.conversation_id) === Number(activeContact.conversation_id);
     }
@@ -32,11 +39,45 @@ export default function ChatArea({ activeContact, onBack }) {
     const isToContact = (m.recipient_fp === activeContact?.fingerprint);
 
     return (isFromMe && isToContact) || isFromContact;
-  });
+  }), [messages, activeContact, user]);
+
+  useLayoutEffect(() => {
+    if (prevScrollHeightRef.current && messagesContainerRef.current) {
+        const newHeight = messagesContainerRef.current.scrollHeight;
+        if (newHeight > prevScrollHeightRef.current) {
+            const diff = newHeight - prevScrollHeightRef.current;
+            messagesContainerRef.current.scrollTop = diff;
+            prevScrollHeightRef.current = null;
+        }
+    }
+  }, [activeMessages]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [activeMessages]);
+    if (!loadingMore && activeMessages.length > 0) {
+        const lastMsg = activeMessages[activeMessages.length - 1];
+        if (lastMsg.id !== lastMessageIdRef.current) {
+            lastMessageIdRef.current = lastMsg.id;
+            messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+        }
+    }
+  }, [activeMessages, loadingMore]);
+
+  const handleScroll = async (e) => {
+    const { scrollTop, scrollHeight } = e.currentTarget;
+    
+    if (scrollTop === 0 && !loadingMore && hasMore && activeContact?.conversation_id) {
+        setLoadingMore(true);
+        prevScrollHeightRef.current = scrollHeight; // Capture height before fetch
+        
+        const loadedCount = await fetchMessages(activeContact.conversation_id, activeMessages.length);
+        
+        if (loadedCount < 50) {
+            setHasMore(false);
+        }
+        
+        setLoadingMore(false);
+    }
+  };
 
   const handleSend = async (e) => {
     e.preventDefault();
@@ -114,7 +155,16 @@ export default function ChatArea({ activeContact, onBack }) {
         )}
       </header>
       
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div 
+        ref={messagesContainerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent bg-gradient-to-br from-slate-900 via-slate-900 to-blue-900/10"
+      >
+        {loadingMore && (
+           <div className="flex justify-center p-2 mb-2 w-full">
+               <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+           </div>
+        )}
         {activeMessages.map((msg, i) => {
           const isMe = msg.sender_fp === user?.fingerprint;
           const currentMsgDate = new Date(msg.created_at || Date.now()).toDateString();

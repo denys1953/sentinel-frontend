@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { decryptPrivateKey } from '../services/crypto';
+import { decryptPrivateKeyWithMasterKey, deriveMasterKey, exportMasterKey } from '../services/crypto';
 import { db } from '../services/db';
 import api from '../api/axios';
 
@@ -23,10 +23,13 @@ export default function LoginPage() {
       const res = await api.get('/users/me'); 
       const { enc_private_key, salt } = res.data;
 
-      const privKey = await decryptPrivateKey(enc_private_key, password, salt);
+      const masterKey = await deriveMasterKey(password, salt);
+      const privKey = await decryptPrivateKeyWithMasterKey(enc_private_key, masterKey);
       setPrivateKey(privKey);
       
-      localStorage.setItem('last_pwd', password); 
+      const exportedMasterKey = await exportMasterKey(masterKey);
+      sessionStorage.setItem('master_key', exportedMasterKey);
+
       await db.keys.put({ username, encPrivateKey: enc_private_key, salt });
 
       navigate('/chat');

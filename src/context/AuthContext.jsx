@@ -2,7 +2,7 @@ import { createContext, useState, useContext, useEffect } from 'react';
 import api from '../api/axios';
 import { isTokenExpired } from '../api/auth';
 import { db } from '../services/db';
-import { decryptPrivateKey } from '../services/crypto';
+import { decryptPrivateKeyWithMasterKey, importMasterKey } from '../services/crypto';
 
 const AuthContext = createContext();
 
@@ -13,8 +13,8 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const token = localStorage.getItem('token');
-      const storedUser = localStorage.getItem('user');
+      const token = sessionStorage.getItem('token');
+      const storedUser = sessionStorage.getItem('user');
 
       if (token && isTokenExpired(token)) {
         logout();
@@ -25,17 +25,18 @@ export const AuthProvider = ({ children }) => {
             setUser(userData);
             
             const keyRecord = await db.keys.get(userData.username);
-            const savedPwd = sessionStorage.getItem('last_pwd');
-            if (keyRecord && savedPwd) {
+            const savedMasterKey = sessionStorage.getItem('master_key');
+            if (keyRecord && savedMasterKey) {
               try {
-                const privKey = await decryptPrivateKey(
+                const masterKey = await importMasterKey(savedMasterKey);
+                const privKey = await decryptPrivateKeyWithMasterKey(
                   keyRecord.encPrivateKey, 
-                  savedPwd, 
-                  keyRecord.salt
+                  masterKey
                 );
                 setPrivateKey(privKey);
               } catch (e) {
-                console.warn("Failed to restore private key automatically");
+                console.warn("Failed to restore private key automatically", e);
+                sessionStorage.removeItem('master_key');
               }
             }
           }
@@ -47,7 +48,7 @@ export const AuthProvider = ({ children }) => {
             }
             return res.data;
           });
-          localStorage.setItem('user', JSON.stringify(res.data));
+          sessionStorage.setItem('user', JSON.stringify(res.data));
         } catch (err) {
           console.error("Auth initialization failed:", err);
           logout();
@@ -60,8 +61,9 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = async (username, password) => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('user');
+    sessionStorage.removeItem('master_key');
     sessionStorage.removeItem('last_pwd');
 
     const formData = new URLSearchParams();
@@ -76,22 +78,22 @@ export const AuthProvider = ({ children }) => {
 
     const { access_token, user: loggedUser } = response.data;
     
-    localStorage.setItem('token', access_token);
-    sessionStorage.setItem('last_pwd', password); 
+    sessionStorage.setItem('token', access_token);
     
     if (loggedUser) {
-      localStorage.setItem('user', JSON.stringify(loggedUser));
+      sessionStorage.setItem('user', JSON.stringify(loggedUser));
       setUser(loggedUser);
     } else {
       const meRes = await api.get('/users/me');
-      localStorage.setItem('user', JSON.stringify(meRes.data));
+      sessionStorage.setItem('user', JSON.stringify(meRes.data));
       setUser(meRes.data);
     }
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('user');
+    sessionStorage.removeItem('master_key');
     sessionStorage.removeItem('last_pwd');
     setUser(null);
     setPrivateKey(null);

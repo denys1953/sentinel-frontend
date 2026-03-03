@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../api/axios';
-import { generateRegistrationData } from '../services/crypto';
+import { generateRegistrationData, deriveMasterKey, exportMasterKey } from '../services/crypto';
 import { db } from '../services/db';
 import { useAuth } from '../context/AuthContext';
 
@@ -36,6 +36,10 @@ export default function RegisterPage() {
       
       await login(username, password);
       setPrivateKey(rawPrivateKey);
+
+      const masterKey = await deriveMasterKey(password, salt);
+      const exportedMasterKey = await exportMasterKey(masterKey);
+      sessionStorage.setItem('master_key', exportedMasterKey);
 
       setTimeout(() => {
         navigate('/chat');

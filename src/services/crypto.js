@@ -20,7 +20,7 @@ const base64ToBuf = (str) => {
   }
 };
 
-async function deriveMasterKey(password, salt) {
+export async function deriveMasterKey(password, salt) {
   const encoder = new TextEncoder();
   const baseKey = await window.crypto.subtle.importKey(
     "raw",
@@ -39,10 +39,26 @@ async function deriveMasterKey(password, salt) {
     },
     baseKey,
     AES_PARAMS,
-    false,
+    true,
     ["encrypt", "decrypt"]
   );
 }
+
+export const exportMasterKey = async (key) => {
+  const exported = await window.crypto.subtle.exportKey("jwk", key);
+  return JSON.stringify(exported);
+};
+
+export const importMasterKey = async (jsonJwk) => {
+  const jwk = JSON.parse(jsonJwk);
+  return window.crypto.subtle.importKey(
+    "jwk",
+    jwk,
+    AES_PARAMS,
+    true,
+    ["encrypt", "decrypt"]
+  );
+};
 
 export const generateRegistrationData = async (password) => {
   const saltBuf = window.crypto.getRandomValues(new Uint8Array(16));
@@ -76,11 +92,14 @@ export const generateRegistrationData = async (password) => {
 };
 
 export const decryptPrivateKey = async (encPrivateKeyB64, password, salt) => {
+  const masterKey = await deriveMasterKey(password, salt);
+  return decryptPrivateKeyWithMasterKey(encPrivateKeyB64, masterKey);
+};
+
+export const decryptPrivateKeyWithMasterKey = async (encPrivateKeyB64, masterKey) => {
   const combined = base64ToBuf(encPrivateKeyB64);
   const iv = combined.slice(0, 12);
   const data = combined.slice(12);
-
-  const masterKey = await deriveMasterKey(password, salt);
 
   try {
     const decryptedPrivBuf = await window.crypto.subtle.decrypt(

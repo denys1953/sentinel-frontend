@@ -22,7 +22,7 @@ export const SocketProvider = ({ children }) => {
       return;
     }
 
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     const fingerprint = user.fingerprint;
     const wsBase = import.meta.env.VITE_WS_URL;
     const wsUrl = `${wsBase}/ws/${fingerprint}?token=${token}`;
@@ -229,65 +229,80 @@ export const SocketProvider = ({ children }) => {
     setMessages(prev => [...prev, { ...msg, created_at: msg.created_at || new Date().toISOString() }]);
   };
 
-  const fetchMessages = useCallback(async (conversationId) => {
-    if (!conversationId || !privateKey || !user) return;
+  const fetchMessages = useCallback(async (conversationId, offset = 0) => {
+    if (!conversationId || !privateKey || !user) return 0;
     try {
-      const localMsgs = await db.messages
+      const allLocalMsgs = await db.messages
         .where('conversation_id')
         .equals(Number(conversationId))
         .toArray();
       
-      if (localMsgs.length > 0) {
-        setMessages(prev => {
-          const filteredPrev = prev.filter(m => 
-            !(m.is_loading && Number(m.conversation_id) === Number(conversationId))
-          );
-          
-          const existingIds = new Set(filteredPrev.map(m => m.id));
-          const sorted = [...filteredPrev, ...localMsgs.filter(m => !existingIds.has(m.id))]
-            .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-          return sorted;
+      const sortedLocal = allLocalMsgs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      const localPage = sortedLocal.slice(offset, offset + 50);
+
+      let decodedHistory = [];
+      try {
+        const response = await api.get(`/conversations/${conversationId}`, {
+          params: { limit: 50, offset }
         });
+        const history = response.data;
+
+        decodedHistory = await Promise.all(history.map(async (m) => {
+          const isMe = m.sender_id === user.id;
+          const targetContent = isMe ? m.content_self : m.content_encoded;
+          
+          let content = "[Помилка дешифрування]";
+          try {
+            content = await decryptWithPrivateKey(targetContent, privateKey);
+          } catch (err) {
+            console.error("History decryption failed", err);
+          }
+
+          const msg = {
+            id: m.id,
+            conversation_id: m.conversation_id,
+            sender_fp: m.sender_fp || (isMe ? user.fingerprint : null),
+            content,
+            created_at: m.created_at,
+            recipient_id: m.recipient_id,
+            sender_id: m.sender_id
+          };
+
+          const existing = await db.messages.get(m.id);
+          if (!existing) {
+            await db.messages.put(msg);
+          }
+          return msg;
+        }));
+      } catch (apiErr) {
+        console.warn("Could not fetch from API, using local only", apiErr);
       }
 
-      const response = await api.get(`/conversations/${conversationId}`);
-      const history = response.data;
-
-      const decodedHistory = await Promise.all(history.map(async (m) => {
-        const isMe = m.sender_id === user.id;
-        const targetContent = isMe ? m.content_self : m.content_encoded;
-        
-        let content = "[Помилка дешифрування]";
-        try {
-          content = await decryptWithPrivateKey(targetContent, privateKey);
-        } catch (err) {
-          console.error("History decryption failed", err);
-        }
-
-        const msg = {
-          id: m.id,
-          conversation_id: m.conversation_id,
-          sender_fp: m.sender_fp || (isMe ? user.fingerprint : null),
-          content,
-          created_at: m.created_at,
-          recipient_id: m.recipient_id,
-          sender_id: m.sender_id
-        };
-
-        await db.messages.put(msg);
-        return msg;
-      }));
-
       setMessages(prev => {
-        const filteredPrev = prev.filter(m => 
-          !(m.is_loading && Number(m.conversation_id) === Number(conversationId))
-        );
-        const existingIds = new Set(filteredPrev.map(m => m.id));
-        const newMsgs = decodedHistory.filter(m => !existingIds.has(m.id));
-        return [...filteredPrev, ...newMsgs].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        const messagesFromOtherChats = prev.filter(m => Number(m.conversation_id) !== Number(conversationId));
+        
+        const messagesForThisChat = offset === 0 ? [] : prev.filter(m => Number(m.conversation_id) === Number(conversationId));
+
+        const loadingMessages = prev.filter(m => m.is_loading && Number(m.conversation_id) === Number(conversationId));
+
+        const combinedPool = [...messagesForThisChat, ...localPage, ...decodedHistory];
+
+        const uniqueMessagesMap = new Map();
+        combinedPool.forEach(m => uniqueMessagesMap.set(m.id, m));
+
+        loadingMessages.forEach(m => uniqueMessagesMap.set(m.id, m));
+
+        const uniqueMessages = Array.from(uniqueMessagesMap.values());
+        
+        uniqueMessages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+        return [...messagesFromOtherChats, ...uniqueMessages];
       });
+      
+      return Math.max(localPage.length, decodedHistory.length);
     } catch (err) {
       console.error("Failed to fetch messages history", err);
+      return 0;
     }
   }, [user, privateKey]);
 
