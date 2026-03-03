@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import EmptyState from './EmptyState';
 
-export default function ChatArea({ activeContact }) {
+export default function ChatArea({ activeContact, onBack }) {
   const [messageText, setMessageText] = useState('');
   const { messages, sendMessage, fetchMessages, setCurrentChat, isConnected } = useSocket();
   const { user } = useAuth();
@@ -65,17 +65,29 @@ export default function ChatArea({ activeContact }) {
 
   if (!activeContact) {
     return (
-      <main className="flex-1 flex flex-col bg-slate-900/50 relative">
+      <main className="flex-1 flex flex-col bg-slate-900/50 relative w-full h-full">
         <EmptyState />
       </main>
     );
   }
 
   return (
-    <main className="flex-1 flex flex-col bg-slate-900/50 relative text-slate-200">
+    <main className="w-full flex-1 flex flex-col bg-slate-900/50 relative text-slate-200">
       {/* Header with User Info */}
-      <header className="h-16 px-6 border-b border-slate-800 bg-slate-900/80 backdrop-blur-md flex items-center justify-between z-10 shrink-0">
-        <div className="flex items-center gap-4">
+      <header className="h-16 px-4 md:px-6 border-b border-slate-800 bg-slate-900/80 backdrop-blur-md flex items-center justify-between z-10 shrink-0">
+        <div className="flex items-center gap-3 md:gap-4">
+          {/* Back button for mobile */}
+          {onBack && (
+            <button 
+              onClick={onBack}
+              className="md:hidden p-2 -ml-2 text-slate-400 hover:text-white"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+          )}
+
           <div className="relative">
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center text-sm font-bold shadow-lg">
               {activeContact.username?.[0]?.toUpperCase()}
@@ -123,7 +135,7 @@ export default function ChatArea({ activeContact }) {
               <div 
                 className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
               >
-                <div className={`max-w-[85%] sm:max-w-[60%] min-w-[70px] p-2.5 px-3.5 rounded-2xl ${
+                <div className={`max-w-[85%] sm:max-w-[70%] min-w-[70px] p-2.5 px-3.5 rounded-2xl ${
                   isMe ? 'bg-blue-600 rounded-tr-sm' : 'bg-slate-800 rounded-tl-sm'
                 } shadow-lg relative group`}>
                   <div className="flex flex-col leading-tight">

@@ -35,14 +35,28 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="flex h-screen bg-slate-900 text-white overflow-hidden font-sans">
-      <Sidebar 
-        user={user} 
-        onLogout={handleLogout} 
-        onContactSelect={handleContactSelect}
-        activeContactId={activeContact?.conversation_id || activeContact?.id || activeContact?.username}
-      />
-      <ChatArea activeContact={activeContact} />
+    <div className="flex h-dvh bg-slate-900 text-white overflow-hidden font-sans">
+      <div className={`
+        ${activeContact ? 'hidden' : 'flex'} 
+        md:flex w-full md:w-auto shrink-0
+      `}>
+        <Sidebar 
+          user={user} 
+          onLogout={handleLogout} 
+          onContactSelect={handleContactSelect}
+          activeContactId={activeContact?.conversation_id || activeContact?.id || activeContact?.username}
+        />
+      </div>
+      
+      <div className={`
+        ${!activeContact ? 'hidden' : 'flex'} 
+        md:flex flex-1 w-full
+      `}>
+        <ChatArea 
+          activeContact={activeContact} 
+          onBack={() => setActiveContact(null)}
+        />
+      </div>
     </div>
   );
 }

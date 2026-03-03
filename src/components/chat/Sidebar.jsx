@@ -183,7 +183,7 @@ export default function Sidebar({ user, onLogout, onContactSelect, activeContact
   return (
     <aside 
       style={{ width: `${sidebarWidth}px` }}
-      className="flex flex-col border-r border-slate-800 bg-slate-800/50 backdrop-blur-sm relative shrink-0"
+      className="flex flex-col border-r border-slate-800 bg-slate-800/50 backdrop-blur-sm relative shrink-0 !w-full md:!w-auto"
     >
       <div className="h-16 flex items-center px-4 border-b border-slate-700/50">        
         {/* Search Input */}
