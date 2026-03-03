@@ -1,13 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSocket } from '../../context/SocketContext';
 import { useAuth } from '../../context/AuthContext';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import EmptyState from './EmptyState';
 
 export default function ChatArea({ activeContact }) {
   const [messageText, setMessageText] = useState('');
-  const { messages, sendMessage, fetchMessages, setCurrentChat } = useSocket();
+  const { messages, sendMessage, fetchMessages, setCurrentChat, isConnected } = useSocket();
   const { user } = useAuth();
   const messagesEndRef = useRef(null);
+  
+  const onlineStatuses = useOnlineStatus(activeContact?.fingerprint, 30000);
+  const isOnline = activeContact ? !!onlineStatuses[activeContact.fingerprint] : false;
 
   useEffect(() => {
     if (activeContact?.conversation_id) {
@@ -68,14 +72,34 @@ export default function ChatArea({ activeContact }) {
   }
 
   return (
-    <main className="flex-1 flex flex-col bg-slate-900/50 relative">
-      <header className="h-16 border-b border-slate-800 bg-slate-900/80 backdrop-blur-md flex items-center justify-between px-6 z-10 shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold">
-            {activeContact.username?.[0]?.toUpperCase()}
+    <main className="flex-1 flex flex-col bg-slate-900/50 relative text-slate-200">
+      {/* Header with User Info */}
+      <header className="h-16 px-6 border-b border-slate-800 bg-slate-900/80 backdrop-blur-md flex items-center justify-between z-10 shrink-0">
+        <div className="flex items-center gap-4">
+          <div className="relative">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center text-sm font-bold shadow-lg">
+              {activeContact.username?.[0]?.toUpperCase()}
+            </div>
+            {isOnline && (
+              <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-slate-900 rounded-full animate-pulse shadow-green-500/20 shadow-lg"></div>
+            )}
           </div>
-          <span className="font-semibold text-slate-200">{activeContact.username}</span>
+          
+          <div className="flex flex-col justify-center">
+            <span className="font-semibold text-white tracking-wide">{activeContact.username}</span>
+            {isOnline ? (
+              <span className="text-xs text-green-400 font-medium">Онлайн</span>
+            ) : (
+             <span className="text-xs text-slate-500">Офлайн</span>
+            )}
+          </div>
         </div>
+
+        {!isConnected && (
+            <div className="text-xs font-bold text-amber-500 bg-amber-500/10 px-3 py-1 rounded-full animate-pulse">
+                З'єднання...
+            </div>
+        )}
       </header>
       
       <div className="flex-1 overflow-y-auto p-4 space-y-4">

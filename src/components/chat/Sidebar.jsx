@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import api from '../../api/axios';
 import { useSocket } from '../../context/SocketContext';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 
 export default function Sidebar({ user, onLogout, onContactSelect, activeContactId }) {
   const { messages } = useSocket();
@@ -11,6 +12,14 @@ export default function Sidebar({ user, onLogout, onContactSelect, activeContact
   const [conversations, setConversations] = useState([]);
   const [isLoadingConversations, setIsLoadingConversations] = useState(false);
   const isResizing = useRef(false);
+
+  const fingerprintsToTrack = useMemo(() => {
+    return conversations
+      .map(c => c.participants.find(p => p.user?.fingerprint !== user?.fingerprint)?.user?.fingerprint)
+      .filter(Boolean);
+  }, [conversations, user?.fingerprint]);
+
+  const onlineStatuses = useOnlineStatus(fingerprintsToTrack, 30000);
 
   useEffect(() => {
     const fetchConversations = async () => {
@@ -96,6 +105,9 @@ export default function Sidebar({ user, onLogout, onContactSelect, activeContact
         }));
     }
   }, [activeContactId, user?.fingerprint]);
+
+  useEffect(() => {
+  }, [conversations, user?.fingerprint]);
 
   const handleSelect = (contact, convId) => {
     onContactSelect(contact);
@@ -248,6 +260,7 @@ export default function Sidebar({ user, onLogout, onContactSelect, activeContact
 
                 const isActive = activeContactId === conv.id;
                 const unreadCount = getMyUnreadCount(conv.participants);
+                const isOnline = onlineStatuses[other.fingerprint];
                 
                 return (
                   <button
@@ -257,10 +270,15 @@ export default function Sidebar({ user, onLogout, onContactSelect, activeContact
                       isActive ? 'bg-blue-600 text-white' : 'hover:bg-slate-700/50 text-slate-200'
                     }`}
                   >
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-colors shrink-0 ${
-                      isActive ? 'bg-white/20 text-white' : 'bg-slate-700 text-blue-400 group-hover:bg-blue-600 group-hover:text-white'
-                    }`}>
-                      {other.username?.[0]?.toUpperCase()}
+                    <div className="relative shrink-0">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-colors ${
+                        isActive ? 'bg-white/20 text-white' : 'bg-slate-700 text-blue-400 group-hover:bg-blue-600 group-hover:text-white'
+                      }`}>
+                        {other.username?.[0]?.toUpperCase()}
+                      </div>
+                      {isOnline && (
+                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-slate-900 rounded-full shadow-sm"></div>
+                      )}
                     </div>
                     <div className="flex-1 overflow-hidden pr-2">
                       <div className="font-medium truncate">{other.username}</div>
