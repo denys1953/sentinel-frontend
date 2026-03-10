@@ -4,7 +4,7 @@ import { useSocket } from '../../context/SocketContext';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import ProfileModal from './ProfileModal';
 
-export default function Sidebar({ user, onLogout, onContactSelect, activeContactId }) {
+export default function Sidebar({ user, onLogout, onContactSelect, activeContactId, activeContact }) {
   const { messages } = useSocket();
   const [sidebarWidth, setSidebarWidth] = useState(320);
   const [searchQuery, setSearchQuery] = useState('');
@@ -149,7 +149,19 @@ export default function Sidebar({ user, onLogout, onContactSelect, activeContact
     if (!participants || !Array.isArray(participants)) return null;
     const participant = participants.find(p => p.user?.fingerprint !== user?.fingerprint);
     return participant?.user || null;
-  };
+  }; 
+
+  useEffect(() => {
+    if (activeContact && conversations.length > 0) {
+       const activeConv = conversations.find(c => Number(c.id) === Number(activeContactId));
+       if (activeConv) {
+           const other = getOtherParticipant(activeConv.participants);
+           if (other && (other.avatar_url !== activeContact.avatar_url || other.username !== activeContact.username)) {
+               onContactSelect({ ...other, conversation_id: activeConv.id });
+           }
+       }
+    }
+  }, [conversations, activeContact, activeContactId, user?.fingerprint]);
 
   const getMyUnreadCount = (participants) => {
     if (!participants || !Array.isArray(participants)) return 0;

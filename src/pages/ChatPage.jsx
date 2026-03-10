@@ -45,6 +45,7 @@ export default function ChatPage() {
           onLogout={handleLogout} 
           onContactSelect={handleContactSelect}
           activeContactId={activeContact?.conversation_id || activeContact?.id || activeContact?.username}
+          activeContact={activeContact}
         />
       </div>
       
