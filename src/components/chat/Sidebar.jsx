@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import api from '../../api/axios';
 import { useSocket } from '../../context/SocketContext';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
+import ProfileModal from './ProfileModal';
 
 export default function Sidebar({ user, onLogout, onContactSelect, activeContactId }) {
   const { messages } = useSocket();
@@ -11,6 +12,7 @@ export default function Sidebar({ user, onLogout, onContactSelect, activeContact
   const [isSearching, setIsSearching] = useState(false);
   const [conversations, setConversations] = useState([]);
   const [isLoadingConversations, setIsLoadingConversations] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const isResizing = useRef(false);
 
   const fingerprintsToTrack = useMemo(() => {
@@ -225,12 +227,16 @@ export default function Sidebar({ user, onLogout, onContactSelect, activeContact
                     : 'hover:bg-slate-700/50 text-slate-200'
                   }`}
                 >
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-colors ${
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-colors overflow-hidden ${
                     (activeContactId === (contact.id || contact.username))
                     ? 'bg-white/20 text-white'
                     : 'bg-slate-700 text-blue-400 group-hover:bg-blue-600 group-hover:text-white'
                   }`}>
-                    {contact.username?.[0]?.toUpperCase()}
+                    {contact.avatar_url ? (
+                      <img src={contact.avatar_url} alt={contact.username} className="w-full h-full object-cover" />
+                    ) : (
+                      contact.username?.[0]?.toUpperCase()
+                    )}
                   </div>
                   <div className="flex-1 overflow-hidden">
                     <div className="font-medium truncate">{contact.username}</div>
@@ -271,10 +277,14 @@ export default function Sidebar({ user, onLogout, onContactSelect, activeContact
                     }`}
                   >
                     <div className="relative shrink-0">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-colors ${
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-colors overflow-hidden ${
                         isActive ? 'bg-white/20 text-white' : 'bg-slate-700 text-blue-400 group-hover:bg-blue-600 group-hover:text-white'
                       }`}>
-                        {other.username?.[0]?.toUpperCase()}
+                        {other.avatar_url ? (
+                          <img src={other.avatar_url} alt={other.username} className="w-full h-full object-cover" />
+                        ) : (
+                          other.username?.[0]?.toUpperCase()
+                        )}
                       </div>
                       {isOnline && (
                         <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-slate-900 rounded-full shadow-sm"></div>
@@ -308,12 +318,19 @@ export default function Sidebar({ user, onLogout, onContactSelect, activeContact
       {/* User Info & Logout Button */}
       <div className="p-4 border-t border-slate-700/50 bg-slate-800">
         <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 overflow-hidden text-nowrap">
-            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold shrink-0">
-              {user?.username?.[0]?.toUpperCase() || 'U'}
+          <button 
+            onClick={() => setIsProfileOpen(true)}
+            className="flex items-center gap-2 overflow-hidden text-nowrap flex-1 hover:bg-slate-700/50 rounded-lg p-1 -ml-1 transition-colors group text-left"
+          >
+            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold shrink-0 overflow-hidden ring-2 ring-slate-700 group-hover:ring-blue-500/50 transition-all">
+              {user?.avatar_url ? (
+                <img src={user.avatar_url} alt={user.username} className="w-full h-full object-cover" />
+              ) : (
+                user?.username?.[0]?.toUpperCase() || 'U'
+              )}
             </div>
-            <span className="truncate text-sm font-medium">{user?.username}</span>
-          </div>
+            <span className="truncate text-sm font-medium group-hover:text-blue-100 transition-colors">{user?.username}</span>
+          </button>
           <button 
             onClick={onLogout}
             className="px-3 py-1.5 bg-slate-700 hover:bg-red-600/20 hover:text-red-500 text-slate-300 text-xs font-medium rounded-lg transition-all duration-200 border border-slate-600 shrink-0"
@@ -330,6 +347,10 @@ export default function Sidebar({ user, onLogout, onContactSelect, activeContact
       >
         <div className="absolute top-0 right-0 w-[1px] h-full bg-slate-800 group-hover:bg-blue-500/50" />
       </div>
+
+      {isProfileOpen && (
+        <ProfileModal onClose={() => setIsProfileOpen(false)} />
+      )}
     </aside>
   );
 }

@@ -130,8 +130,12 @@ export default function ChatArea({ activeContact, onBack }) {
           )}
 
           <div className="relative">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center text-sm font-bold shadow-lg">
-              {activeContact.username?.[0]?.toUpperCase()}
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center text-sm font-bold shadow-lg overflow-hidden shrink-0">
+              {activeContact.avatar_url ? (
+                <img src={activeContact.avatar_url} alt={activeContact.username} className="w-full h-full object-cover" />
+              ) : (
+                activeContact.username?.[0]?.toUpperCase()
+              )}
             </div>
             {isOnline && (
               <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-slate-900 rounded-full animate-pulse shadow-green-500/20 shadow-lg"></div>
@@ -170,6 +174,10 @@ export default function ChatArea({ activeContact, onBack }) {
           const currentMsgDate = new Date(msg.created_at || Date.now()).toDateString();
           const prevMsgDate = i > 0 ? new Date(activeMessages[i-1].created_at || Date.now()).toDateString() : null;
           const showDateSeparator = currentMsgDate !== prevMsgDate;
+
+          const nextMsg = activeMessages[i + 1];
+          const nextMsgDate = nextMsg ? new Date(nextMsg.created_at || Date.now()).toDateString() : null;
+          const isLastInSequence = !nextMsg || nextMsg.sender_fp !== msg.sender_fp || nextMsgDate !== currentMsgDate;
           
           return (
             <div key={i}>
@@ -183,8 +191,19 @@ export default function ChatArea({ activeContact, onBack }) {
                 </div>
               )}
               <div 
-                className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
+                className={`flex items-end gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}
               >
+                {!isMe && (
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold overflow-hidden shrink-0 mb-1 z-0 transition-opacity ${
+                    isLastInSequence ? 'bg-slate-700 shadow-md opacity-100' : 'opacity-0'
+                  }`}>
+                    {activeContact.avatar_url ? (
+                      <img src={activeContact.avatar_url} alt={activeContact.username} className="w-full h-full object-cover" />
+                    ) : (
+                      activeContact.username?.[0]?.toUpperCase()
+                    )}
+                  </div>
+                )}
                 <div className={`max-w-[85%] sm:max-w-[70%] min-w-[70px] p-2.5 px-3.5 rounded-2xl ${
                   isMe ? 'bg-blue-600 rounded-tr-sm' : 'bg-slate-800 rounded-tl-sm'
                 } shadow-lg relative group`}>
@@ -206,6 +225,17 @@ export default function ChatArea({ activeContact, onBack }) {
                     </div>
                   </div>
                 </div>
+                {isMe && (
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold overflow-hidden shrink-0 mb-1 z-0 transition-opacity ${
+                    isLastInSequence ? 'bg-blue-700 shadow-md ring-2 ring-blue-800 opacity-100' : 'opacity-0'
+                  }`}>
+                    {user?.avatar_url ? (
+                      <img src={user.avatar_url} alt={user.username} className="w-full h-full object-cover" />
+                    ) : (
+                      user?.username?.[0]?.toUpperCase()
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           );

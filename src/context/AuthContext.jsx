@@ -90,6 +90,16 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const updateUser = async () => {
+    try {
+      const res = await api.get('/users/me');
+      setUser(res.data);
+      sessionStorage.setItem('user', JSON.stringify(res.data));
+    } catch (err) {
+      console.error("Failed to update user info:", err);
+    }
+  };
+
   const logout = () => {
     sessionStorage.removeItem('token');
     sessionStorage.removeItem('user');
@@ -100,7 +110,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isLoading: loading, privateKey, setPrivateKey }}>
+    <AuthContext.Provider value={{ user, login, logout, privateKey, setPrivateKey, loading, updateUser }}>
       {!loading && children}
     </AuthContext.Provider>
   );
