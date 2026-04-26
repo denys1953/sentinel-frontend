@@ -54,6 +54,59 @@ export const SocketProvider = ({ children }) => {
           return;
         }
 
+        if (data.type === 'delete_message') {
+          await db.messages.delete(data.message_id);
+          setMessages(prev => prev.filter(m => m.id !== data.message_id));
+          if (typeof window !== 'undefined' && window.__triggerSidebarUpdate) {
+            window.__triggerSidebarUpdate();
+          }
+          return;
+        }
+
+        if (data.type === 'edit_message' && data.message) {
+          try {
+            const m = data.message;
+            const isMe = m.sender_id === user.id || m.sender_fp === user.fingerprint;
+            const targetContent = isMe ? m.content_self : m.content_encoded;
+            
+            let content = "[Помилка дешифрування]";
+            let error = false;
+            
+            if (privateKey) {
+              try {
+                content = await decryptWithPrivateKey(targetContent, privateKey);
+              } catch (err) {
+                console.error("Decryption failed for edit", err);
+                error = true;
+              }
+            } else {
+              error = true;
+            }
+
+            const updatedMsg = {
+              id: m.id,
+              conversation_id: m.conversation_id,
+              sender_fp: m.sender_fp || (isMe ? user.fingerprint : null),
+              content,
+              error,
+              created_at: m.created_at,
+              updated_at: m.updated_at,
+              is_edited: m.is_edited
+            };
+
+            await db.messages.put(updatedMsg);
+
+            setMessages(prev => prev.map(msg => msg.id === m.id ? { ...msg, ...updatedMsg } : msg));
+            
+            if (typeof window !== 'undefined' && window.__triggerSidebarUpdate) {
+              window.__triggerSidebarUpdate();
+            }
+          } catch (err) {
+            console.error("Edit message processing error", err);
+          }
+          return;
+        }
+
         if ((data.type === 'chat_message' || data.type === 'new_message') && data.content) {
           try {
             let content = "[Повідомлення зашифроване]";
@@ -76,7 +129,8 @@ export const SocketProvider = ({ children }) => {
               sender_fp: data.sender_fp || data.sender,
               content,
               error,
-              created_at: data.timestamp || data.created_at || new Date().toISOString()
+              created_at: data.timestamp || data.created_at || new Date().toISOString(),
+              reply_to_id: data.reply_to_id || null
             };
 
             await db.messages.put(incomingMsg);
@@ -182,7 +236,7 @@ export const SocketProvider = ({ children }) => {
     };
   }, [connect, user, privateKey]);
 
-  const sendMessage = async (text, activeContact) => {
+  const sendMessage = async (text, activeContact, replyToId = null) => {
     if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
       console.error("Socket is not open! Current state:", socketRef.current?.readyState);
       return;
@@ -199,7 +253,8 @@ export const SocketProvider = ({ children }) => {
         conversation_id: activeContact.conversation_id || null, 
         recipient_id: activeContact.conversation_id ? null : activeContact.id, 
         content_encoded,
-        content_self
+        content_self,
+        reply_to_id: replyToId
       };
 
       socketRef.current.send(JSON.stringify(payload));
@@ -216,6 +271,7 @@ export const SocketProvider = ({ children }) => {
         sender_fp: user.fingerprint,
         content: text, 
         created_at: new Date().toISOString(),
+        reply_to_id: replyToId,
         is_loading: true
       };
 
@@ -264,8 +320,11 @@ export const SocketProvider = ({ children }) => {
             sender_fp: m.sender_fp || (isMe ? user.fingerprint : null),
             content,
             created_at: m.created_at,
+            updated_at: m.updated_at,
+            is_edited: m.is_edited,
             recipient_id: m.recipient_id,
-            sender_id: m.sender_id
+            sender_id: m.sender_id,
+            reply_to_id: m.reply_to_id || null
           };
 
           const existing = await db.messages.get(m.id);
@@ -306,8 +365,40 @@ export const SocketProvider = ({ children }) => {
     }
   }, [user, privateKey]);
 
+  const deleteMessageLocal = async (messageId) => {
+    try {
+      await api.delete(`/conversations/messages/${messageId}`);
+      await db.messages.delete(messageId);
+      setMessages(prev => prev.filter(m => m.id !== messageId));
+      if (typeof window !== 'undefined' && window.__triggerSidebarUpdate) {
+        window.__triggerSidebarUpdate();
+      }
+    } catch (err) {
+      console.error("Failed to delete message", err);
+      // optionally show notification to user
+    }
+  };
+
+  const editMessageLocal = async (messageId, newText, activeContact) => {
+    try {
+      const { content_encoded, content_self } = await prepareE2EEPayload(
+        newText,
+        activeContact.public_key,
+        user.public_key
+      );
+
+      await api.patch(`/conversations/messages/${messageId}`, {
+        content_encoded,
+        content_self
+      });
+      // The websocket edit_message event will handle updating the state and db
+    } catch (err) {
+      console.error("Failed to edit message", err);
+    }
+  };
+
   return (
-    <SocketContext.Provider value={{ isConnected, messages, sendMessage, addLocalMessage, fetchMessages, setCurrentChat }}>
+    <SocketContext.Provider value={{ isConnected, messages, sendMessage, addLocalMessage, fetchMessages, setCurrentChat, deleteMessage: deleteMessageLocal, editMessage: editMessageLocal }}>
       {children}
     </SocketContext.Provider>
   );

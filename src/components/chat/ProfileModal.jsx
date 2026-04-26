@@ -55,65 +55,69 @@ export default function ProfileModal({ onClose }) {
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="bg-slate-800 border border-slate-700/50 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden relative animate-in zoom-in-95 duration-200">
-        <button 
-          onClick={onClose}
-          className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors bg-slate-900/50 hover:bg-slate-700 rounded-full p-1 z-10"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={onClose}>
+      <div 
+        className="bg-slate-900 border border-slate-700/50 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="relative h-24 bg-gradient-to-r from-blue-600 to-indigo-600">
+          <button 
+            onClick={onClose}
+            className="absolute top-3 right-3 p-1.5 bg-black/20 hover:bg-black/40 rounded-full text-white/80 hover:text-white transition-colors z-10"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
 
-        <div className="p-6 pt-8">
-          <div className="flex flex-col items-center gap-4 mb-6">
-            <div className="relative group cursor-pointer" onClick={handleAvatarClick}>
-              <div className="w-28 h-28 rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-4xl font-bold text-white overflow-hidden ring-4 ring-slate-700/50 shadow-xl relative z-0">
-                {user?.avatar_url ? (
-                  <img src={user.avatar_url} alt={user.username} className="w-full h-full object-cover" />
-                ) : (
-                  user?.username?.[0]?.toUpperCase()
-                )}
-              </div>
-              
-              <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full backdrop-blur-[2px] z-10">
-                <input 
-                  type="file" 
-                  accept="image/*" 
-                  className="hidden" 
-                  onChange={handleAvatarChange}
-                  disabled={uploading}
-                  ref={fileInputRef}
-                />
-                {uploading ? (
-                  <div className="w-8 h-8 border-2 border-white/50 border-t-white rounded-full animate-spin"></div>
-                ) : (
-                  <svg className="w-8 h-8 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                )}
-              </div>
-              
-              <div className="absolute bottom-1 right-1 bg-slate-800 rounded-full p-1.5 border border-slate-600 group-hover:opacity-0 transition-opacity z-20 shadow-lg">
-                 <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                 </svg>
-              </div>
+        <div className="px-6 pb-6 pt-0 relative flex flex-col items-center">
+          <div className="relative group cursor-pointer w-24 h-24 rounded-full border-4 border-slate-900 bg-slate-800 -mt-12 mb-3 shadow-lg z-0" onClick={handleAvatarClick}>
+            <div className="w-full h-full rounded-full flex items-center justify-center text-4xl font-bold text-white overflow-hidden bg-blue-600">
+              {user?.avatar_url ? (
+                <img src={user.avatar_url} alt={user.username} className="w-full h-full object-cover" />
+              ) : (
+                user?.username?.[0]?.toUpperCase()
+              )}
             </div>
             
-            <div className="text-center w-full">
-              <h3 className="text-xl font-bold text-white tracking-tight">{user?.username}</h3>
-              <div className="flex items-center justify-center gap-2 mt-1">
-                 <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                 <span className="text-xs text-green-400/80 font-medium">В мережі</span>
-              </div>
+            <div className={`absolute bottom-0 right-0 w-4 h-4 rounded-full border-2 border-slate-900 bg-green-500 z-10`} />
+
+            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full backdrop-blur-[2px] z-20">
+              <input 
+                type="file" 
+                accept="image/*" 
+                className="hidden" 
+                onChange={handleAvatarChange}
+                disabled={uploading}
+                ref={fileInputRef}
+              />
+              {uploading ? (
+                <div className="w-8 h-8 border-2 border-white/50 border-t-white rounded-full animate-spin"></div>
+              ) : (
+                <svg className="w-6 h-6 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              )}
+            </div>
+            
+            <div className="absolute bottom-0 right-0 max-w-[20px] max-h-[20px] bg-slate-800 rounded-full p-1 border border-slate-600 group-hover:opacity-0 transition-opacity z-30 shadow-lg translate-x-1/4 translate-y-1/4">
+               <svg className="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+               </svg>
             </div>
           </div>
+          
+          <div className="text-center w-full mb-6">
+            <h3 className="text-2xl font-bold text-white mb-1 tracking-tight">{user?.username}</h3>
+            <p className="text-sm text-green-500">
+              В мережі
+            </p>
+          </div>
 
-          <div className="space-y-4">
-            <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50 hover:border-slate-600/50 transition-colors group">
+          <div className="w-full space-y-3">
+            <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50 hover:border-slate-600/50 transition-colors group">
               <div className="flex justify-between items-center mb-1">
                 <label className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Fingerprint ID</label>
                 <div className="text-[10px] text-slate-600 italic group-hover:text-blue-400/50 transition-colors">Унікальний ідентифікатор</div>
@@ -140,7 +144,7 @@ export default function ProfileModal({ onClose }) {
             
             <button 
                 onClick={onClose}
-                className="w-full py-3 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-medium rounded-xl transition-all duration-200 mt-2"
+                className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-medium rounded-xl transition-all duration-200 mt-2 border border-slate-700"
             >
                 Закрити
             </button>

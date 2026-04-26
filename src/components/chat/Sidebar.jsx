@@ -196,8 +196,8 @@ export default function Sidebar({ user, onLogout, onContactSelect, activeContact
 
   return (
     <aside 
-      style={{ width: `${sidebarWidth}px` }}
-      className="flex flex-col border-r border-slate-800 bg-slate-800/50 backdrop-blur-sm relative shrink-0 !w-full md:!w-auto"
+      style={{ '--sidebar-width': `${sidebarWidth}px` }}
+      className="flex flex-col border-r border-slate-800 bg-slate-800/50 backdrop-blur-sm relative shrink-0 w-full md:w-[var(--sidebar-width)]"
     >
       <div className="h-16 flex items-center px-4 border-b border-slate-700/50">        
         {/* Search Input */}
@@ -332,16 +332,25 @@ export default function Sidebar({ user, onLogout, onContactSelect, activeContact
         <div className="flex items-center justify-between gap-3">
           <button 
             onClick={() => setIsProfileOpen(true)}
-            className="flex items-center gap-2 overflow-hidden text-nowrap flex-1 hover:bg-slate-700/50 rounded-lg p-1 -ml-1 transition-colors group text-left"
+            className="flex items-center gap-3 overflow-hidden text-nowrap flex-1 hover:bg-slate-700/50 rounded-lg p-1 -ml-1 transition-colors group text-left"
           >
-            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold shrink-0 overflow-hidden ring-2 ring-slate-700 group-hover:ring-blue-500/50 transition-all">
+            <div className="relative shrink-0">
               {user?.avatar_url ? (
-                <img src={user.avatar_url} alt={user.username} className="w-full h-full object-cover" />
+                <img src={user.avatar_url} alt={user.username} className="w-10 h-10 rounded-full object-cover shadow-md" />
               ) : (
-                user?.username?.[0]?.toUpperCase() || 'U'
+                <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-md">
+                  {user?.username?.[0]?.toUpperCase() || 'U'}
+                </div>
               )}
+              <div className="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-slate-900 transition-colors duration-300 bg-green-500" />
             </div>
-            <span className="truncate text-sm font-medium group-hover:text-blue-100 transition-colors">{user?.username}</span>
+            
+            <div className="flex flex-col truncate">
+              <span className="font-bold text-white text-lg leading-tight group-hover:text-blue-100 transition-colors truncate">{user?.username}</span>
+              <span className="text-xs font-medium text-green-500 mt-0.5">
+                Онлайн
+              </span>
+            </div>
           </button>
           <button 
             onClick={onLogout}
@@ -355,9 +364,9 @@ export default function Sidebar({ user, onLogout, onContactSelect, activeContact
       {/* Resize Handle */}
       <div 
         onMouseDown={startResizing}
-        className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-blue-500/30 transition-colors group"
+        className="absolute top-0 -right-1 w-2 h-full cursor-col-resize hover:bg-blue-500/30 transition-colors group z-10"
       >
-        <div className="absolute top-0 right-0 w-[1px] h-full bg-slate-800 group-hover:bg-blue-500/50" />
+        <div className="absolute top-0 right-[3px] w-[1px] h-full bg-slate-800 group-hover:bg-blue-500/50" />
       </div>
 
       {isProfileOpen && (

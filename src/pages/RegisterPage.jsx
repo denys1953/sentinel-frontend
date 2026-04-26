@@ -23,7 +23,7 @@ export default function RegisterPage() {
       const { publicKey, encPrivateKey, salt, rawPrivateKey } = await generateRegistrationData(password);
 
       await api.post('/auth/register', {
-        username,
+        username: username.trim(),
         password,
         public_key: publicKey,
         enc_private_key: encPrivateKey,

@@ -19,7 +19,9 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response, 
   (error) => {
-    if (error.response && error.response.status === 401) {
+    const isAuthRoute = error.config && error.config.url && error.config.url.includes('/auth/');
+    
+    if (error.response && error.response.status === 401 && !isAuthRoute) {
       console.warn("Token expired or invalid. Logging out...");
       sessionStorage.removeItem('token');
       sessionStorage.removeItem('user');
