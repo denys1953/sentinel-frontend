@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react';
 import { useSocket } from '../../context/SocketContext';
 import { useAuth } from '../../context/AuthContext';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
+import { useSemanticSearch } from '../../hooks/useSemanticSearch';
 import EmptyState from './EmptyState';
 import { db } from '../../services/db';
 
@@ -16,6 +17,8 @@ export default function ChatArea({ activeContact, onBack }) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [msgToDelete, setMsgToDelete] = useState(null);
+  const [activeTouchMessageId, setActiveTouchMessageId] = useState(null);
+  const touchTimerRef = useRef(null);
   const [editingMessageId, setEditingMessageId] = useState(null);
   const [replyingToMessage, setReplyingToMessage] = useState(null);
   const [showUserInfo, setShowUserInfo] = useState(false);
@@ -23,6 +26,10 @@ export default function ChatArea({ activeContact, onBack }) {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
+  
+  const [isSemanticSearch, setIsSemanticSearch] = useState(false);
+  const [semanticSearching, setSemanticSearching] = useState(false);
+  const { initModel, isReady, modelLoading, progress, search: doSemanticSearch, indexMessages } = useSemanticSearch();
   
   const onlineStatuses = useOnlineStatus(activeContact?.fingerprint, 30000);
   const isOnline = activeContact ? !!onlineStatuses[activeContact.fingerprint] : false;
@@ -35,13 +42,26 @@ export default function ChatArea({ activeContact, onBack }) {
     
     const fetchSearchResults = async () => {
        const allMsgs = await db.messages.where('conversation_id').equals(Number(activeContact.conversation_id)).toArray();
-       const query = searchQuery.toLowerCase();
-       const matches = allMsgs.filter(m => m.content && m.content.toLowerCase().includes(query));
-       setSearchResults(matches.sort((a,b) => new Date(a.created_at) - new Date(b.created_at)));
+       
+       if (isSemanticSearch) {
+          if (!isReady) {
+             await initModel(); 
+          }
+          setSemanticSearching(true);
+          indexMessages(allMsgs);
+          const matches = await doSemanticSearch(searchQuery, allMsgs);
+          setSearchResults(matches);
+          setSemanticSearching(false);
+       } else {
+           const query = searchQuery.toLowerCase();
+           const matches = allMsgs.filter(m => m.content && m.content.toLowerCase().includes(query));
+           setSearchResults(matches.sort((a,b) => new Date(a.created_at) - new Date(b.created_at)));
+       }
     };
-    const timer = setTimeout(() => fetchSearchResults(), 200); 
+    
+    const timer = setTimeout(() => fetchSearchResults(), isSemanticSearch ? 500 : 200); 
     return () => clearTimeout(timer);
-  }, [searchQuery, isSearchOpen, activeContact?.conversation_id]);
+  }, [searchQuery, isSearchOpen, activeContact?.conversation_id, isSemanticSearch, isReady, doSemanticSearch, initModel, indexMessages]);
 
   const highlightText = (text, highlight) => {
     if (!highlight.trim()) return text;
@@ -250,24 +270,57 @@ export default function ChatArea({ activeContact, onBack }) {
           </div>
         </div>
         {isSearchOpen ? (
-          <div className="flex w-full items-center gap-3 animate-in fade-in slide-in-from-top-1 duration-200">
-            <svg className="w-5 h-5 text-slate-400 shrink-0 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <input 
-              autoFocus
-              type="text"
-              placeholder="Пошук повідомлень..."
-              className="flex-1 bg-slate-800 text-slate-200 py-2 px-4 rounded-xl border border-slate-700 focus:outline-none focus:border-blue-500/50 transition-all placeholder:text-slate-500 shadow-inner"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-            />
-            <button 
-              onClick={() => { setIsSearchOpen(false); setSearchQuery(''); }}
-              className="p-2 text-slate-400 hover:text-white transition-colors text-sm font-medium"
-            >
-              Закрити
-            </button>
+          <div className="flex w-full flex-col gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
+            <div className="flex items-center gap-3">
+              <svg className="w-5 h-5 text-slate-400 shrink-0 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input 
+                autoFocus
+                type="text"
+                placeholder={isSemanticSearch ? "Опишіть зміст (напр. 'зустріч завтра')" : "Пошук за точним словом..."}
+                className={`flex-1 bg-slate-800 text-slate-200 py-2 px-4 rounded-xl border focus:outline-none transition-all placeholder:text-slate-500 shadow-inner ${
+                  isSemanticSearch 
+                    ? 'border-indigo-500/50 focus:border-indigo-400/80' 
+                    : 'border-slate-700 focus:border-blue-500/50'
+                }`}
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+              />
+              <button 
+                onClick={() => { setIsSearchOpen(false); setSearchQuery(''); }}
+                className="p-2 text-slate-400 hover:text-white transition-colors text-sm font-medium"
+              >
+                Закрити
+              </button>
+            </div>
+            
+            <div className="flex justify-between items-center pl-10 pr-2">
+              <label className="flex items-center gap-2 cursor-pointer group">
+                <div className="relative flex items-center">
+                  <input 
+                    type="checkbox" 
+                    className="peer sr-only"
+                    checked={isSemanticSearch}
+                    onChange={(e) => {
+                      setIsSemanticSearch(e.target.checked);
+                      if (e.target.checked && !isReady) initModel();
+                    }}
+                  />
+                  <div className="w-8 h-4 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-indigo-500"></div>
+                </div>
+                <span className={`text-xs font-medium transition-colors ${
+                  isSemanticSearch ? 'text-indigo-400' : 'text-slate-500 group-hover:text-slate-300'
+                }`}>
+                  Семантичний (ШІ)
+                </span>
+              </label>
+              
+              <div className="text-[10px] text-slate-400 font-medium">
+                {modelLoading && <span className="text-indigo-400 animate-pulse">Завантаження ШІ {progress}%...</span>}
+                {isSemanticSearch && !modelLoading && isReady && semanticSearching && <span className="text-indigo-400 animate-pulse">Пошук смислу...</span>}
+              </div>
+            </div>
           </div>
         ) : (
           <div className="flex items-center gap-2">
@@ -292,6 +345,9 @@ export default function ChatArea({ activeContact, onBack }) {
       <div 
         ref={messagesContainerRef}
         onScroll={handleScroll}
+        onClick={() => {
+           if (activeTouchMessageId) setActiveTouchMessageId(null);
+        }}
         className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent bg-gradient-to-br from-slate-900 via-slate-900 to-blue-900/10"
       >
         {isSearchOpen && searchQuery.trim() ? (
@@ -388,16 +444,29 @@ export default function ChatArea({ activeContact, onBack }) {
                         )}
                       </div>
                     )}
-                    <div className={`message-bubble max-w-[85%] sm:max-w-[70%] min-w-[70px] p-2.5 px-3.5 rounded-2xl ${
-                      isMe ? 'bg-blue-600 rounded-tr-sm' : 'bg-slate-800 rounded-tl-sm'
-                    } shadow-lg relative group transition-all`}>
-                        <div className="flex flex-col leading-tight w-full">
+                    <div 
+                      className={`message-bubble max-w-[85%] sm:max-w-[70%] min-w-[70px] p-2.5 px-3.5 rounded-2xl ${
+                        isMe ? 'bg-blue-600 rounded-tr-sm' : 'bg-slate-800 rounded-tl-sm'
+                      } shadow-lg relative group transition-all min-w-0`}
+                      onTouchStart={() => {
+                         touchTimerRef.current = setTimeout(() => {
+                            setActiveTouchMessageId(msg.id);
+                         }, 400); // 400ms long press
+                      }}
+                      onTouchMove={() => {
+                         if (touchTimerRef.current) clearTimeout(touchTimerRef.current);
+                      }}
+                      onTouchEnd={() => {
+                         if (touchTimerRef.current) clearTimeout(touchTimerRef.current);
+                      }}
+                    >
+                        <div className="flex flex-col leading-tight w-full min-w-0">
                         {msg.reply_to_id && (() => {
                           const repliedMsg = activeMessages.find(m => m.id === msg.reply_to_id);
                           return (
                             <div 
                               onClick={() => jumpToMessage(msg.reply_to_id)}
-                              className="mb-1.5 pl-2.5 border-l-2 border-white/30 bg-black/10 rounded-r-md py-1 px-2 cursor-pointer hover:bg-black/20 transition-colors opacity-90 overflow-hidden"
+                              className="mb-1.5 pl-2.5 border-l-2 border-white/30 bg-black/10 rounded-r-md py-1 px-2 cursor-pointer hover:bg-black/20 transition-colors opacity-90 overflow-hidden min-w-0 max-w-[250px] sm:max-w-[350px]"
                             >
                               <span className="text-[11px] font-bold text-white/90 block mb-0.5 truncate">
                                 {repliedMsg ? (repliedMsg.sender_fp === user?.fingerprint ? 'Ви' : activeContact.username) : 'Видалене повідомлення'}
@@ -428,7 +497,7 @@ export default function ChatArea({ activeContact, onBack }) {
                       </div>
                       
                       {!isMe && (
-                        <div className="absolute top-1/2 -translate-y-1/2 -right-10 flex items-center opacity-0 group-hover:opacity-100 transition-all">
+                        <div className={`absolute top-1/2 -translate-y-1/2 -right-10 flex items-center transition-all ${activeTouchMessageId === msg.id ? 'opacity-100 z-10' : 'opacity-0 group-hover:opacity-100'}`}>
                           <button 
                             onClick={() => handleReplyInit(msg)}
                             title="Відповісти"
@@ -442,7 +511,7 @@ export default function ChatArea({ activeContact, onBack }) {
                       )}
 
                       {isMe && !msg.is_loading && (
-                        <div className="absolute top-1/2 -translate-y-1/2 -left-24 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all shadow-md">
+                        <div className={`absolute top-1/2 -translate-y-1/2 -left-24 flex items-center gap-1 transition-all shadow-md ${activeTouchMessageId === msg.id ? 'opacity-100 z-10' : 'opacity-0 group-hover:opacity-100'}`}>
                           <button 
                             onClick={() => handleReplyInit(msg)}
                             title="Відповісти"
