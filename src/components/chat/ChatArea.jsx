@@ -4,11 +4,39 @@ import { useAuth } from '../../context/AuthContext';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { useSemanticSearch } from '../../hooks/useSemanticSearch';
 import EmptyState from './EmptyState';
-import { db } from '../../services/db';
+
+const RepliedMessagePreview = ({ replyToId, activeMessages, user, activeContact, onJump, fetchSingleMessage }) => {
+  const [repliedMsg, setRepliedMsg] = useState(() => activeMessages.find(m => m.id === replyToId));
+
+  useEffect(() => {
+    const msg = activeMessages.find(m => m.id === replyToId);
+    if (msg) {
+      setRepliedMsg(msg);
+    } else if (fetchSingleMessage) {
+      fetchSingleMessage(replyToId).then(fetchedMsg => {
+        if (fetchedMsg) setRepliedMsg(fetchedMsg);
+      });
+    }
+  }, [replyToId, activeMessages, fetchSingleMessage]);
+
+  return (
+    <div 
+      onClick={() => onJump(replyToId)}
+      className="mb-1.5 pl-2.5 border-l-2 border-white/30 bg-black/10 rounded-r-md py-1 px-2 cursor-pointer hover:bg-black/20 transition-colors opacity-90 overflow-hidden min-w-0 max-w-[250px] sm:max-w-[350px]"
+    >
+      <span className="text-[11px] font-bold text-white/90 block mb-0.5 truncate">
+        {repliedMsg ? (repliedMsg.sender_fp === user?.fingerprint ? 'Ви' : activeContact.username) : 'Повідомлення'}
+      </span>
+      <span className="text-[12px] opacity-80 truncate block leading-tight">
+        {repliedMsg ? repliedMsg.content : 'Завантаження...'}
+      </span>
+    </div>
+  );
+};
 
 export default function ChatArea({ activeContact, onBack }) {
   const [messageText, setMessageText] = useState('');
-  const { messages, sendMessage, fetchMessages, setCurrentChat, isConnected, deleteMessage, editMessage } = useSocket();
+  const { messages, sendMessage, fetchMessages, fetchSingleMessage, setCurrentChat, isConnected, deleteMessage, editMessage } = useSocket();
   const { user } = useAuth();
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
@@ -41,7 +69,7 @@ export default function ChatArea({ activeContact, onBack }) {
     }
     
     const fetchSearchResults = async () => {
-       const allMsgs = await db.messages.where('conversation_id').equals(Number(activeContact.conversation_id)).toArray();
+       const allMsgs = messages.filter(m => Number(m.conversation_id) === Number(activeContact.conversation_id));
        
        if (isSemanticSearch) {
           if (!isReady) {
@@ -61,7 +89,7 @@ export default function ChatArea({ activeContact, onBack }) {
     
     const timer = setTimeout(() => fetchSearchResults(), isSemanticSearch ? 500 : 200); 
     return () => clearTimeout(timer);
-  }, [searchQuery, isSearchOpen, activeContact?.conversation_id, isSemanticSearch, isReady, doSemanticSearch, initModel, indexMessages]);
+  }, [searchQuery, isSearchOpen, activeContact?.conversation_id, isSemanticSearch, isReady, doSemanticSearch, initModel, indexMessages, messages]);
 
   const highlightText = (text, highlight) => {
     if (!highlight.trim()) return text;
@@ -461,22 +489,16 @@ export default function ChatArea({ activeContact, onBack }) {
                       }}
                     >
                         <div className="flex flex-col leading-tight w-full min-w-0">
-                        {msg.reply_to_id && (() => {
-                          const repliedMsg = activeMessages.find(m => m.id === msg.reply_to_id);
-                          return (
-                            <div 
-                              onClick={() => jumpToMessage(msg.reply_to_id)}
-                              className="mb-1.5 pl-2.5 border-l-2 border-white/30 bg-black/10 rounded-r-md py-1 px-2 cursor-pointer hover:bg-black/20 transition-colors opacity-90 overflow-hidden min-w-0 max-w-[250px] sm:max-w-[350px]"
-                            >
-                              <span className="text-[11px] font-bold text-white/90 block mb-0.5 truncate">
-                                {repliedMsg ? (repliedMsg.sender_fp === user?.fingerprint ? 'Ви' : activeContact.username) : 'Видалене повідомлення'}
-                              </span>
-                              <span className="text-[12px] opacity-80 truncate block leading-tight">
-                                {repliedMsg ? repliedMsg.content : 'Повідомлення було видалено'}
-                              </span>
-                            </div>
-                          );
-                        })()}
+                        {msg.reply_to_id && (
+                          <RepliedMessagePreview 
+                            replyToId={msg.reply_to_id} 
+                            activeMessages={activeMessages} 
+                            user={user} 
+                            activeContact={activeContact} 
+                            onJump={jumpToMessage}
+                            fetchSingleMessage={fetchSingleMessage}
+                          />
+                        )}
                         <p className="text-[15px] whitespace-pre-wrap break-words">
                           {isSearchOpen && searchQuery.trim() ? highlightText(msg.content, searchQuery) : msg.content}
                           <span className={`inline-block translate-y-1 ${msg.is_edited ? 'w-[85px]' : 'w-[45px]'}`}></span>

@@ -1,7 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import { useAuth } from './AuthContext';
 import { encryptForRecipient, decryptWithPrivateKey, prepareE2EEPayload } from '../services/crypto';
-import { db } from '../services/db';
 import api from '../api/axios';
 import { showNotification } from '../services/notification.service';
 
@@ -55,7 +54,6 @@ export const SocketProvider = ({ children }) => {
         }
 
         if (data.type === 'delete_message') {
-          await db.messages.delete(data.message_id);
           setMessages(prev => prev.filter(m => m.id !== data.message_id));
           if (typeof window !== 'undefined' && window.__triggerSidebarUpdate) {
             window.__triggerSidebarUpdate();
@@ -94,8 +92,6 @@ export const SocketProvider = ({ children }) => {
               is_edited: m.is_edited
             };
 
-            await db.messages.put(updatedMsg);
-
             setMessages(prev => prev.map(msg => msg.id === m.id ? { ...msg, ...updatedMsg } : msg));
             
             if (typeof window !== 'undefined' && window.__triggerSidebarUpdate) {
@@ -133,11 +129,7 @@ export const SocketProvider = ({ children }) => {
               reply_to_id: data.reply_to_id || null
             };
 
-            await db.messages.put(incomingMsg);
-
-            if (typeof window !== 'undefined' && window.__triggerSidebarUpdate) {
-              window.__triggerSidebarUpdate();
-            }
+            // Sidebar update removed to prevent double increment of unread count
 
             setMessages(prev => {
                if (prev.some(m => m.id === incomingMsg.id)) return prev;
@@ -149,9 +141,15 @@ export const SocketProvider = ({ children }) => {
                    (!m.conversation_id || Number(m.conversation_id) === Number(incomingMsg.conversation_id))
                  );
                  if (optIdx !== -1) {
-                   const updated = [...prev];
-                   updated[optIdx] = incomingMsg;
-                   return updated;
+                   const oldMsg = prev[optIdx];
+                   incomingMsg.recipient_fp = oldMsg.recipient_fp;
+                   const newArr = [...prev];
+                   newArr[optIdx] = incomingMsg; 
+                   
+                   if (!oldMsg.conversation_id && typeof window !== 'undefined' && window.__triggerSidebarUpdate) {
+                       window.__triggerSidebarUpdate();
+                   }
+                   return newArr;
                  }
                }
 
@@ -288,14 +286,6 @@ export const SocketProvider = ({ children }) => {
   const fetchMessages = useCallback(async (conversationId, offset = 0) => {
     if (!conversationId || !privateKey || !user) return 0;
     try {
-      const allLocalMsgs = await db.messages
-        .where('conversation_id')
-        .equals(Number(conversationId))
-        .toArray();
-      
-      const sortedLocal = allLocalMsgs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-      const localPage = sortedLocal.slice(offset, offset + 50);
-
       let decodedHistory = [];
       try {
         const response = await api.get(`/conversations/${conversationId}`, {
@@ -327,14 +317,10 @@ export const SocketProvider = ({ children }) => {
             reply_to_id: m.reply_to_id || null
           };
 
-          const existing = await db.messages.get(m.id);
-          if (!existing) {
-            await db.messages.put(msg);
-          }
           return msg;
         }));
       } catch (apiErr) {
-        console.warn("Could not fetch from API, using local only", apiErr);
+        console.warn("Could not fetch from API", apiErr);
       }
 
       setMessages(prev => {
@@ -344,7 +330,7 @@ export const SocketProvider = ({ children }) => {
 
         const loadingMessages = prev.filter(m => m.is_loading && Number(m.conversation_id) === Number(conversationId));
 
-        const combinedPool = [...messagesForThisChat, ...localPage, ...decodedHistory];
+        const combinedPool = [...messagesForThisChat, ...decodedHistory];
 
         const uniqueMessagesMap = new Map();
         combinedPool.forEach(m => uniqueMessagesMap.set(m.id, m));
@@ -358,17 +344,47 @@ export const SocketProvider = ({ children }) => {
         return [...messagesFromOtherChats, ...uniqueMessages];
       });
       
-      return Math.max(localPage.length, decodedHistory.length);
+      return decodedHistory.length;
     } catch (err) {
       console.error("Failed to fetch messages history", err);
       return 0;
     }
   }, [user, privateKey]);
 
+  const fetchSingleMessage = async (messageId) => {
+    try {
+      const response = await api.get(`/conversations/messages/${messageId}`);
+      const m = response.data;
+      if (!m) return null;
+      const isMe = m.sender_id === user.id;
+      const targetContent = isMe ? m.content_self : m.content_encoded;
+      let content = "[Помилка дешифрування]";
+      try {
+        content = await decryptWithPrivateKey(targetContent, privateKey);
+      } catch (err) {
+        console.error("Single message decryption failed", err);
+      }
+      return {
+        id: m.id,
+        conversation_id: m.conversation_id,
+        sender_fp: m.sender_fp || (isMe ? user.fingerprint : null),
+        content,
+        created_at: m.created_at,
+        updated_at: m.updated_at,
+        is_edited: m.is_edited,
+        recipient_id: m.recipient_id,
+        sender_id: m.sender_id,
+        reply_to_id: m.reply_to_id || null
+      };
+    } catch (err) {
+      console.error("Failed to fetch single message", err);
+      return null;
+    }
+  };
+
   const deleteMessageLocal = async (messageId) => {
     try {
       await api.delete(`/conversations/messages/${messageId}`);
-      await db.messages.delete(messageId);
       setMessages(prev => prev.filter(m => m.id !== messageId));
       if (typeof window !== 'undefined' && window.__triggerSidebarUpdate) {
         window.__triggerSidebarUpdate();
@@ -398,7 +414,7 @@ export const SocketProvider = ({ children }) => {
   };
 
   return (
-    <SocketContext.Provider value={{ isConnected, messages, sendMessage, addLocalMessage, fetchMessages, setCurrentChat, deleteMessage: deleteMessageLocal, editMessage: editMessageLocal }}>
+    <SocketContext.Provider value={{ isConnected, messages, sendMessage, addLocalMessage, fetchMessages, fetchSingleMessage, setCurrentChat, deleteMessage: deleteMessageLocal, editMessage: editMessageLocal }}>
       {children}
     </SocketContext.Provider>
   );

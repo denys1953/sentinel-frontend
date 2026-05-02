@@ -7,7 +7,10 @@ export default function ProfileModal({ onClose }) {
   const { user, updateUser } = useAuth();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const fileInputRef = useRef(null);
+
+  // 2FA state is view-only now as it's mandatory
 
   const handleAvatarClick = () => {
     if (!uploading && fileInputRef.current) {
@@ -53,6 +56,8 @@ export default function ProfileModal({ onClose }) {
       navigator.clipboard.writeText(user.fingerprint);
     }
   };
+
+
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={onClose}>
@@ -137,9 +142,13 @@ export default function ProfileModal({ onClose }) {
                 </button>
               </div>
             </div>
+
             
             {error && (
               <p className="text-red-400 text-xs text-center bg-red-500/10 border border-red-500/20 p-3 rounded-xl animate-in fade-in slide-in-from-top-1">{error}</p>
+            )}
+            {success && (
+              <p className="text-green-400 text-xs text-center bg-green-500/10 border border-green-500/20 p-3 rounded-xl animate-in fade-in slide-in-from-top-1">{success}</p>
             )}
             
             <button 

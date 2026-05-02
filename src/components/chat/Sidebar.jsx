@@ -113,6 +113,7 @@ export default function Sidebar({ user, onLogout, onContactSelect, activeContact
 
   const handleSelect = (contact, convId) => {
     onContactSelect(contact);
+    setSearchQuery('');
   };
 
   const startResizing = useCallback(() => {
@@ -153,15 +154,19 @@ export default function Sidebar({ user, onLogout, onContactSelect, activeContact
 
   useEffect(() => {
     if (activeContact && conversations.length > 0) {
-       const activeConv = conversations.find(c => Number(c.id) === Number(activeContactId));
+       const activeConv = conversations.find(c => {
+           const other = getOtherParticipant(c.participants);
+           return other && (other.id === activeContact.id || other.username === activeContact.username || other.fingerprint === activeContact.fingerprint);
+       });
+       
        if (activeConv) {
            const other = getOtherParticipant(activeConv.participants);
-           if (other && (other.avatar_url !== activeContact.avatar_url || other.username !== activeContact.username)) {
+           if (!activeContact.conversation_id || other.avatar_url !== activeContact.avatar_url || other.username !== activeContact.username) {
                onContactSelect({ ...other, conversation_id: activeConv.id });
            }
        }
     }
-  }, [conversations, activeContact, activeContactId, user?.fingerprint]);
+  }, [conversations, activeContact, user?.fingerprint]);
 
   const getMyUnreadCount = (participants) => {
     if (!participants || !Array.isArray(participants)) return 0;
@@ -232,7 +237,7 @@ export default function Sidebar({ user, onLogout, onContactSelect, activeContact
               searchResults.map((contact) => (
                 <button
                   key={contact.id || contact.username}
-                  onClick={() => onContactSelect(contact)}
+                  onClick={() => handleSelect(contact)}
                   className={`w-full flex items-center gap-3 p-3 rounded-xl transition-colors group text-left ${
                     (activeContactId === (contact.id || contact.username))
                     ? 'bg-blue-600 text-white' 

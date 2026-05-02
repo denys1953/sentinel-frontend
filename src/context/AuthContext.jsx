@@ -76,18 +76,31 @@ export const AuthProvider = ({ children }) => {
       }
     });
 
-    const { access_token, user: loggedUser } = response.data;
+    const { access_token, requires_2fa, temp_token, setup_required, qr_code, secret } = response.data;
     
-    sessionStorage.setItem('token', access_token);
-    
-    if (loggedUser) {
-      sessionStorage.setItem('user', JSON.stringify(loggedUser));
-      setUser(loggedUser);
-    } else {
-      const meRes = await api.get('/users/me');
-      sessionStorage.setItem('user', JSON.stringify(meRes.data));
-      setUser(meRes.data);
+    if (requires_2fa) {
+      return { requires_2fa: true, temp_token, setup_required, qr_code, secret };
     }
+    
+    await _finishLogin(access_token);
+    return { success: true };
+  };
+
+  const login2fa = async (tempToken, code) => {
+    const response = await api.post('/auth/login/2fa', {
+      temp_token: tempToken,
+      code
+    });
+    
+    const { access_token } = response.data;
+    await _finishLogin(access_token);
+  };
+
+  const _finishLogin = async (access_token) => {
+    sessionStorage.setItem('token', access_token);
+    const meRes = await api.get('/users/me');
+    sessionStorage.setItem('user', JSON.stringify(meRes.data));
+    setUser(meRes.data);
   };
 
   const updateUser = async () => {
@@ -110,7 +123,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, privateKey, setPrivateKey, loading, updateUser }}>
+    <AuthContext.Provider value={{ user, login, login2fa, logout, privateKey, setPrivateKey, loading, updateUser }}>
       {!loading && children}
     </AuthContext.Provider>
   );
