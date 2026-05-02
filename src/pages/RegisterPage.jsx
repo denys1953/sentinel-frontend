@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext';
 export default function RegisterPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -161,8 +162,7 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-900 font-sans">
       <form onSubmit={handleRegister} className="bg-slate-800 p-8 rounded-xl shadow-lg w-full max-w-md border border-slate-700">
-        <h2 className="text-3xl font-bold text-white mb-6 text-center text-blue-400">Join Sentinel</h2>
-        <p className="text-slate-400 text-center mb-8 italic">Start secure conversations today</p>
+        <h2 className="text-3xl font-bold text-white mb-6 text-center text-blue-400">Sentinel App</h2>
         
         {success && (
           <div className="bg-green-500/10 border border-green-500 text-green-500 p-3 rounded mb-4 text-sm font-medium animate-pulse">
@@ -173,7 +173,7 @@ export default function RegisterPage() {
         {error && <div className="bg-red-500/10 border border-red-500 text-red-500 p-3 rounded mb-4 text-sm font-medium">{error}</div>}
 
         <div className="mb-4">
-          <label className="block text-slate-400 text-sm font-medium mb-1">Username</label>
+          <label className="block text-slate-400 text-sm font-medium mb-1">Ім'я користувача</label>
           <input
             type="text"
             className="w-full p-3 rounded bg-slate-700 text-white border border-slate-600 focus:border-blue-500 outline-none transition"
@@ -184,20 +184,75 @@ export default function RegisterPage() {
         </div>
         
         <div className="mb-6">
-          <label className="block text-slate-400 text-sm font-medium mb-1">Password</label>
+          <label className="block text-slate-400 text-sm font-medium mb-1">Пароль</label>
+          <div className="relative">
+            <input
+              type="password"
+              className={`w-full p-3 rounded bg-slate-700 text-white border outline-none transition-all duration-300 ${
+                password.length >= 8 && /[A-Z]/.test(password) && /[!@#$%^&*(),.?":{}|<>]/.test(password)
+                  ? 'border-green-500/50 shadow-[0_0_15px_rgba(34,197,94,0.1)]'
+                  : password.length > 0 
+                    ? 'border-amber-500/30' 
+                    : 'border-slate-600 focus:border-blue-500'
+              }`}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+          {password && (
+            <div className="mt-3 h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+              <div 
+                className={`h-full transition-all duration-500 ease-out ${
+                  [
+                    password.length >= 8,
+                    /[A-Z]/.test(password),
+                    /[!@#$%^&*(),.?":{}|<>]/.test(password)
+                  ].filter(Boolean).length === 3 
+                    ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]' 
+                    : [
+                        password.length >= 8,
+                        /[A-Z]/.test(password),
+                        /[!@#$%^&*(),.?":{}|<>]/.test(password)
+                      ].filter(Boolean).length === 2
+                      ? 'bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.3)]'
+                      : 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.3)]'
+                }`}
+                style={{ 
+                  width: `${([
+                    password.length >= 8,
+                    /[A-Z]/.test(password),
+                    /[!@#$%^&*(),.?":{}|<>]/.test(password)
+                  ].filter(Boolean).length / 3) * 100}%` 
+                }}
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="mb-6">
+          <label className="block text-slate-400 text-sm font-medium mb-1">Підтвердіть пароль</label>
           <input
             type="password"
-            className="w-full p-3 rounded bg-slate-700 text-white border border-slate-600 focus:border-blue-500 outline-none transition"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            className={`w-full p-3 rounded bg-slate-700 text-white border outline-none transition-all duration-300 ${
+              confirmPassword 
+                ? (password === confirmPassword ? 'border-green-500/50 shadow-[0_0_10px_rgba(34,197,94,0.1)]' : 'border-red-500/50 shadow-[0_0_10px_rgba(239,68,68,0.1)]') 
+                : 'border-slate-600 focus:border-blue-500'
+            }`}
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
             required
           />
         </div>
 
         <button 
           type="submit" 
-          disabled={loading}
-          className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 text-white font-bold p-3 rounded-lg transition active:scale-95 shadow-lg"
+          disabled={
+            loading || 
+            !(password.length >= 8 && /[A-Z]/.test(password) && /[!@#$%^&*(),.?":{}|<>]/.test(password)) ||
+            password !== confirmPassword
+          }
+          className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-600 text-white font-bold p-3 rounded-lg transition-all active:scale-95 shadow-lg disabled:shadow-none"
         >
           {loading ? 'Створення акаунту...' : 'Зареєструватися'}
         </button>

@@ -48,46 +48,9 @@ export default function Sidebar({ user, onLogout, onContactSelect, activeContact
     };
   }, [user]);
 
-  useEffect(() => {
-    if (messages.length === 0) return;
-    const lastMsg = messages[messages.length - 1];
-    
-    if (!lastMsg.conversation_id) return;
-
-    setConversations(prev => {
-      const exists = prev.some(c => Number(c.id) === Number(lastMsg.conversation_id));
-      
-      if (!exists) {
-        api.get('/conversations/').then(res => {
-          setConversations(Array.isArray(res.data) ? res.data : []);
-        }).catch(err => console.error("Refresh convs failed", err));
-        return prev;
-      }
-
-      return prev.map(conv => {
-        if (Number(conv.id) === Number(lastMsg.conversation_id)) {
-            let updatedConv = { 
-              ...conv, 
-              updated_at: lastMsg.created_at || new Date().toISOString() 
-            };
-            
-            const isMe = lastMsg.sender_fp === user?.fingerprint;
-            const isCurrentChat = Number(lastMsg.conversation_id) === Number(activeContactId);
-
-            if (!isMe && !isCurrentChat) {
-                updatedConv.participants = updatedConv.participants.map(p => {
-                    if (p.user?.fingerprint === user?.fingerprint) {
-                        return { ...p, unread_count: (p.unread_count || 0) + 1 };
-                    }
-                    return p;
-                });
-            }
-            return updatedConv;
-        }
-        return conv;
-      });
-    });
-  }, [messages.length, user?.fingerprint]); 
+  // Removed manual messages-based sorting update because it caused jumping during history loads.
+  // Instead, we rely on window.__triggerSidebarUpdate() which is called by SocketContext 
+  // whenever a real new message arrives or is edited.
 
   useEffect(() => {
     if (activeContactId) {
@@ -276,7 +239,12 @@ export default function Sidebar({ user, onLogout, onContactSelect, activeContact
             </h3>
             {conversations.length > 0 ? (
               [...conversations]
-                .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
+                .sort((a, b) => {
+                  const dateA = new Date(a.updated_at).getTime();
+                  const dateB = new Date(b.updated_at).getTime();
+                  if (dateB !== dateA) return dateB - dateA;
+                  return b.id - a.id; // Стабільне сортування
+                })
                 .map((conv) => {
                 const other = getOtherParticipant(conv.participants);
                 if (!other) return null;

@@ -140,7 +140,6 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-slate-900 font-sans">
       <form onSubmit={handleLogin} className="bg-slate-800 p-8 rounded-xl shadow-lg w-full max-w-md border border-slate-700">
         <h2 className="text-3xl font-bold text-white mb-6 text-center text-blue-400">Sentinel App</h2>
-        <p className="text-slate-400 text-center mb-8 italic">Secure messaging for everyone</p>
         
         {isExpired && (
           <div className="bg-yellow-500/10 border border-yellow-500 text-yellow-500 p-3 rounded mb-4 text-sm font-medium">
@@ -151,7 +150,7 @@ export default function LoginPage() {
         {error && <div className="bg-red-500/10 border border-red-500 text-red-500 p-3 rounded mb-4 text-sm font-medium">{error}</div>}
 
         <div className="mb-4">
-          <label className="block text-slate-400 text-sm font-medium mb-1">Username</label>
+          <label className="block text-slate-400 text-sm font-medium mb-1">Ім'я користувача</label>
           <input
             type="text"
             className="w-full p-3 rounded bg-slate-700 text-white border border-slate-600 focus:border-blue-500 outline-none transition"
@@ -162,7 +161,7 @@ export default function LoginPage() {
         </div>
         
         <div className="mb-6">
-          <label className="block text-slate-400 text-sm font-medium mb-1">Password</label>
+          <label className="block text-slate-400 text-sm font-medium mb-1">Пароль</label>
           <input
             type="password"
             className="w-full p-3 rounded bg-slate-700 text-white border border-slate-600 focus:border-blue-500 outline-none transition"

@@ -14,6 +14,16 @@ export const SocketProvider = ({ children }) => {
   const currentChatIdRef = useRef(null);
   const socketRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
+  const [lastUserId, setLastUserId] = useState(user?.id);
+
+  useEffect(() => {
+    if (user?.id !== lastUserId) {
+      setMessages([]);
+      setCurrentChatId(null);
+      currentChatIdRef.current = null;
+      setLastUserId(user?.id);
+    }
+  }, [user?.id, lastUserId]);
 
   const connect = useCallback(() => {
     if (!user || !privateKey) return;
@@ -156,13 +166,8 @@ export const SocketProvider = ({ children }) => {
                return [...prev, incomingMsg];
             });
 
-            const isCurrentChat = currentChatIdRef.current && Number(incomingMsg.conversation_id) === Number(currentChatIdRef.current);
-            if (!error && incomingMsg.sender_fp !== user.fingerprint && !isCurrentChat) {
-              showNotification(
-                "Нове повідомлення",
-                content,
-                incomingMsg.sender_fp
-              );
+            if (typeof window !== 'undefined' && window.__triggerSidebarUpdate) {
+              window.__triggerSidebarUpdate();
             }
           } catch (err) {
             console.error("WebSocket data transformation error:", err);

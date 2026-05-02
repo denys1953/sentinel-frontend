@@ -10,7 +10,6 @@ export default function ProfileModal({ onClose }) {
   const [success, setSuccess] = useState('');
   const fileInputRef = useRef(null);
 
-  // 2FA state is view-only now as it's mandatory
 
   const handleAvatarClick = () => {
     if (!uploading && fileInputRef.current) {
@@ -23,7 +22,7 @@ export default function ProfileModal({ onClose }) {
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
-      setError('File size must be less than 5MB');
+      setError('Розмір файлу має бути менше 5 МБ');
       return;
     }
 
@@ -42,7 +41,7 @@ export default function ProfileModal({ onClose }) {
       await updateUser();
     } catch (err) {
       console.error("Failed to upload avatar:", err);
-      setError('Failed to upload avatar. Please try again.');
+      setError('Не вдалося завантажити аватар. Спробуйте ще раз.');
     } finally {
       setUploading(false);
       if (fileInputRef.current) {
