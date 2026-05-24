@@ -88,66 +88,67 @@ export default function LoginPage() {
       }
   };
 
-  if (requires2FA) {
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-900 font-sans p-4">
-          <form onSubmit={handle2FASubmit} className="bg-slate-800 p-8 rounded-xl shadow-lg w-full max-w-md border border-slate-700">
-            <h2 className="text-3xl font-bold text-white mb-6 text-center text-blue-400">Двофакторна автентифікація</h2>
-            
-            {setupRequired ? (
-              <div className="flex flex-col items-center mb-6">
-                <div className="bg-blue-500/10 border border-blue-500/30 text-blue-400 p-3 rounded-lg text-sm text-center mb-4">
-                  Для вашої безпеки, використання 2FA є обов'язковим. Відскануйте QR-код нижче у своєму додатку Authenticator (напр. Google Authenticator).
-                </div>
-                <div className="bg-white p-2 rounded-xl mb-4">
-                  <img src={qrCode} alt="2FA QR Code" className="w-40 h-40" />
-                </div>
-                <code className="text-xs text-slate-400 bg-slate-900 p-2 rounded break-all text-center max-w-full mb-2">
-                  {secret}
-                </code>
-                <p className="text-slate-400 text-center text-sm">Введіть 6-значний код для підтвердження</p>
-              </div>
-            ) : (
-              <p className="text-slate-400 text-center mb-8">Введіть 6-значний код з вашого додатку Authenticator</p>
-            )}
-            
-            {error && <div className="bg-red-500/10 border border-red-500 text-red-500 p-3 rounded mb-4 text-sm font-medium">{error}</div>}
-
-            <div className="mb-6">
-              <input
-                type="text"
-                maxLength="6"
-                placeholder="000000"
-                className="w-full p-3 rounded bg-slate-700 text-white border border-slate-600 focus:border-blue-500 outline-none transition text-center tracking-widest text-2xl"
-                value={code2fa}
-                onChange={(e) => setCode2fa(e.target.value.replace(/\D/g, ''))}
-                required
-              />
-            </div>
-
-            <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold p-3 rounded-lg transition active:scale-95 shadow-lg">
-              {setupRequired ? 'Підтвердити та увійти' : 'Перевірити'}
-            </button>
-            <button type="button" onClick={() => { setRequires2FA(false); setSetupRequired(false); }} className="w-full mt-4 bg-transparent text-slate-400 hover:text-white p-2 text-sm">
-              Повернутись
-            </button>
-          </form>
-        </div>
-      );
-  }
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-900 font-sans">
-      <form onSubmit={handleLogin} className="bg-slate-800 p-8 rounded-xl shadow-lg w-full max-w-md border border-slate-700">
+    <div className="min-h-screen flex items-center justify-center bg-slate-900 font-sans p-4">
+      {/* 2FA Form */}
+      <form 
+        onSubmit={handle2FASubmit} 
+        className={`bg-slate-800 p-8 rounded-xl shadow-lg w-full max-w-md border border-slate-700 ${!requires2FA ? 'hidden' : ''}`}
+      >
+        <h2 className="text-3xl font-bold text-white mb-6 text-center text-blue-400">Двофакторна автентифікація</h2>
+        
+        {setupRequired ? (
+          <div className="flex flex-col items-center mb-6">
+            <div className="bg-blue-500/10 border border-blue-500/30 text-blue-400 p-3 rounded-lg text-sm text-center mb-4">
+              Для вашої безпеки, використання 2FA є обов'язковим. Відскануйте QR-код нижче у своєму додатку Authenticator (напр. Google Authenticator).
+            </div>
+            <div className="bg-white p-2 rounded-xl mb-4">
+              <img src={qrCode} alt="2FA QR Code" className="w-40 h-40" />
+            </div>
+            <code className="text-xs text-slate-400 bg-slate-900 p-2 rounded break-all text-center max-w-full mb-2">
+              {secret}
+            </code>
+            <p className="text-slate-400 text-center text-sm">Введіть 6-значний код для підтвердження</p>
+          </div>
+        ) : (
+          <p className="text-slate-400 text-center mb-8">Введіть 6-значний код з вашого додатку Authenticator</p>
+        )}
+        
+        {error && requires2FA && <div className="bg-red-500/10 border border-red-500 text-red-500 p-3 rounded mb-4 text-sm font-medium">{error}</div>}
+
+        <div className="mb-6">
+          <input
+            type="text"
+            maxLength="6"
+            placeholder="000000"
+            className="w-full p-3 rounded bg-slate-700 text-white border border-slate-600 focus:border-blue-500 outline-none transition text-center tracking-widest text-2xl"
+            value={code2fa}
+            onChange={(e) => setCode2fa(e.target.value.replace(/\D/g, ''))}
+            required={requires2FA}
+          />
+        </div>
+
+        <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold p-3 rounded-lg transition active:scale-95 shadow-lg">
+          {setupRequired ? 'Підтвердити та увійти' : 'Перевірити'}
+        </button>
+        <button type="button" onClick={() => { setRequires2FA(false); setSetupRequired(false); setError(''); }} className="w-full mt-4 bg-transparent text-slate-400 hover:text-white p-2 text-sm">
+          Повернутись
+        </button>
+      </form>
+
+      <form 
+        onSubmit={handleLogin} 
+        className={`bg-slate-800 p-8 rounded-xl shadow-lg w-full max-w-md border border-slate-700 ${requires2FA ? 'hidden' : ''}`}
+      >
         <h2 className="text-3xl font-bold text-white mb-6 text-center text-blue-400">Авторизація</h2>
         
-        {isExpired && (
+        {isExpired && !requires2FA && (
           <div className="bg-yellow-500/10 border border-yellow-500 text-yellow-500 p-3 rounded mb-4 text-sm font-medium">
             Ваша сесія завершилася. Будь ласка, увійдіть знову.
           </div>
         )}
 
-        {error && <div className="bg-red-500/10 border border-red-500 text-red-500 p-3 rounded mb-4 text-sm font-medium">{error}</div>}
+        {error && !requires2FA && <div className="bg-red-500/10 border border-red-500 text-red-500 p-3 rounded mb-4 text-sm font-medium">{error}</div>}
 
         <div className="mb-4">
           <label className="block text-slate-400 text-sm font-medium mb-1">Ім'я користувача</label>
@@ -156,7 +157,7 @@ export default function LoginPage() {
             className="w-full p-3 rounded bg-slate-700 text-white border border-slate-600 focus:border-blue-500 outline-none transition"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            required
+            required={!requires2FA}
           />
         </div>
         
@@ -167,7 +168,7 @@ export default function LoginPage() {
             className="w-full p-3 rounded bg-slate-700 text-white border border-slate-600 focus:border-blue-500 outline-none transition"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            required
+            required={!requires2FA}
           />
         </div>
 
