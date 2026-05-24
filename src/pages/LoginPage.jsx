@@ -139,7 +139,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-900 font-sans">
       <form onSubmit={handleLogin} className="bg-slate-800 p-8 rounded-xl shadow-lg w-full max-w-md border border-slate-700">
-        <h2 className="text-3xl font-bold text-white mb-6 text-center text-blue-400">Sentinel App</h2>
+        <h2 className="text-3xl font-bold text-white mb-6 text-center text-blue-400">Авторизація</h2>
         
         {isExpired && (
           <div className="bg-yellow-500/10 border border-yellow-500 text-yellow-500 p-3 rounded mb-4 text-sm font-medium">

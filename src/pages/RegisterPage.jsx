@@ -162,7 +162,7 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-900 font-sans">
       <form onSubmit={handleRegister} className="bg-slate-800 p-8 rounded-xl shadow-lg w-full max-w-md border border-slate-700">
-        <h2 className="text-3xl font-bold text-white mb-6 text-center text-blue-400">Sentinel App</h2>
+        <h2 className="text-3xl font-bold text-white mb-6 text-center text-blue-400">Реєстрація</h2>
         
         {success && (
           <div className="bg-green-500/10 border border-green-500 text-green-500 p-3 rounded mb-4 text-sm font-medium animate-pulse">
